@@ -152,6 +152,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 L(0);
 	Intersection it(it0);
 
+	// punto : it.get_position()
+	// normal : it.get_normal()
+	// material : it.intersected()->material()
+
 	//**********************************************************************
 	// The following piece of code is included here for two reasons: first
 	// it works as a 'hello world' code to check that everthing compiles 
@@ -165,7 +169,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	{
 	case 1:
 		// ----------------------------------------------------------------
-		// Display Albedo Only
+		// Display Albedo Only (coeficiente de reflexion)
 		L = it.intersected()->material()->get_albedo(it);
 		break;
 	case 2:
