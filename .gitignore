@@ -20,3 +20,4 @@ SmallPM/SmallPM/Release/SmallPM.unsuccessfulbuild
 *.lastbuildstate
 *.idb
 SmallPM/SmallPM/Debug/SmallPM_vs2010.vcxprojResolveAssemblyReference.cache
+*.opensdf
