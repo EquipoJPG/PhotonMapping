@@ -6,3 +6,17 @@ SmallPM/SmallPM/Release/RenderEngine.obj
 *.obj
 *.suo
 SmallPM/SmallPM_vs2013.sln
+*.exe
+*.hdr
+*.ipch
+*.sln
+*.log
+*.manifest
+*.vcproj
+SmallPM/SmallPM/SmallPM_vs2010.vcxproj.user
+*.vcxproj
+*.sdf
+SmallPM/SmallPM/Release/SmallPM.unsuccessfulbuild
+*.lastbuildstate
+*.idb
+SmallPM/SmallPM/Debug/SmallPM_vs2010.vcxprojResolveAssemblyReference.cache
