@@ -1,0 +1,8 @@
+SmallPM/data/bunny.obj
+*.lib
+*.tlog
+*.pdb
+SmallPM/SmallPM/Release/RenderEngine.obj
+*.obj
+*.suo
+SmallPM/SmallPM_vs2013.sln

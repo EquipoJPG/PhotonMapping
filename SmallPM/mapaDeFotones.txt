@@ -1,0 +1,46 @@
+LEER README IMPORTANTE
+
+Preproceso:
+
+	-Mientras queden fotones por lanzar
+		-Muestrear la fuente luz, hay que implementar la funcion de muestro (muestrear una esfera, sino la distribucion no es uniforme)
+		-Invocar a trace_ray que devuelve dos listas de fotones, una de difusos y otra de causticos.
+			-Flag direct sirve para guardar el primer rebote de los fotones o no. Si no se guarda TENEMOS QUE CALCULAR LA LUZ DIRECTA.
+		
+		-Guardar listas en el KD-Tree
+	-fmq
+	
+-Shading
+
+	input: interseccion
+	output: radiancia de la escena
+	
+	La interseccion incluye el punto, la normal y el material del objeto.
+	
+	
+	
+	
+	m_global_map.find(  std::vector<Real>(p.data,p.data+3), 
+							m_nb_photons,  photons, max_distance ); -> devuelve un vector de fotones
+							
+	por aqui habia que normalizar xD
+							
+	iterar sobre los fotones recuperados y aplicar la ecuacion de render sobre cada foton
+	
+	flujo * albedo * BRDF
+	
+	
+	Para debugear:
+	
+		1. Luz directa
+		2. Luz indirecta (solo, que haya color bleeding con las peculiaridades de photonMapping)
+		
+		Para pruebas usar geometria simple, difusa, sin causticas y luego probar reflejos especulares, causticas y demas.
+		
+		Usar photoshop para ver las imagenes y seleccionar 32-bit, si se mapea mal se quema a blanco la imagen
+		
+
+COMENTARIOS DIEGO:
+
+	-Guardar todas las imagenes generadas, pruebas intermedias y componentes por separado.
+	-Documentar correos a adrian (ajarabo@unizar.es).
