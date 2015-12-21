@@ -152,9 +152,25 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 L(0);
 	Intersection it(it0);
 
+	// it es el punto de interseccion
+	// ESTRUCTURA
+	// -----------------------------------------------------------
+	// 1.- Calcular iluminacion directa en el punto (a cada PL)
+	// 2.- Calcular iluminacion indirecta en el punto a traves
+	//		de la estimacion de radiancia
+	// -----------------------------------------------------------
+	// Debugueo: poner por separado ID e II
+
+
 	// punto : it.get_position()
 	// normal : it.get_normal()
 	// material : it.intersected()->material()
+	// luces : world->light(i)
+	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
+	return L;
+	//for(int i = 0; i < world->nb_lights(); i++){
+		//world->light(i);
+	//}
 
 	//**********************************************************************
 	// The following piece of code is included here for two reasons: first
@@ -163,13 +179,14 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// will need when doing the work. Goes without saying: remove the 
 	// pieces of code that you won't be using.
 	//
-	unsigned int debug_mode = 1;
+	/*
+	unsigned int debug_mode = 0;
 
 	switch (debug_mode)
 	{
 	case 1:
 		// ----------------------------------------------------------------
-		// Display Albedo Only (coeficiente de reflexion)
+		// Display Albedo Only (color?)
 		L = it.intersected()->material()->get_albedo(it);
 		break;
 	case 2:
@@ -205,5 +222,5 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// End of exampled code
 	//**********************************************************************
 
-	return L;
+	return L;*/
 }
