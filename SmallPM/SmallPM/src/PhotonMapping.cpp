@@ -16,6 +16,7 @@ In no event shall copyright holders be liable for any damage.
 #include "Intersection.h"
 #include "Ray.h"
 #include "BSDF.h"
+#include <math.h>
 
 //*********************************************************************
 // Compute the photons by tracing the Ray 'r' from the light source
@@ -118,6 +119,12 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 	return true;
 }
 
+double fRand(double fMin, double fMax)
+{
+	double f = (double) rand() / RAND_MAX;
+	return fMin + f* (fMax - fMin);
+}
+
 //*********************************************************************
 // TODO: Implement the preprocess step of photon mapping,
 // where the photons are traced through the scene. To do it,
@@ -143,9 +150,36 @@ void PhotonMapping::preprocess()
 		Vector3 lightIntensity = world->light(i).get_intensities();
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
 
-		// muestreo
+		// Muestreo de una esfera
+		while (m_nb_current_shots < m_max_nb_shots )
+		{
+
+			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
+			double omega(fRand(0.0,2 * 3.14));
+			double theta(fRand(0.0,2 * 3.14));
+			
+			// Calcula la direccion en base a dos angulos (omega y theta)
+			double x = cos(theta) * sin(omega);
+			double y = cos(theta) * cos(omega);
+			double z = sin(theta);
+			Vector3 photonDir(x,y,z);
+
+			// Crea el rayo (foton) a lanzar
+			Vector3 photonFlux(1);	// energia foton = 1
+			Ray* photonRay = new Ray(lightPos, photonDir);
+
+			// Lanza los fotones muestreados
+			std::list<Photon> globalPhotons;
+			std::list<Photon> causticPhotons;
+			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
+
+			// Almacena las colisiones en el KD-Tree
 
 
+			// Actualiza el numero de fotones muestreados - trace_ray parece ya aumentarlo cada vez D:
+			// m_nb_current_shots++;
+		}
+	}
 }
 
 //*********************************************************************
@@ -162,7 +196,6 @@ void PhotonMapping::preprocess()
 Vector3 PhotonMapping::shade(Intersection &it0)const
 {
 
-	// it es el punto de interseccion
 	// ESTRUCTURA
 	// -----------------------------------------------------------
 	// 1.- Calcular iluminacion directa en el punto (a cada PL)
@@ -179,6 +212,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// TERMINO AMBIENTAL
 	//L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
 
+	// LUZ DIRECTA //
 	for(int i = 0; i < world->nb_lights(); i++){
 		
 		// Obtiene la fuente de luz i-esima
@@ -210,6 +244,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 		}
 	}
+
+	// LUZ INDIRECTA //
 	
 	return L;
 	
