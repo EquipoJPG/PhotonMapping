@@ -134,6 +134,18 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 //---------------------------------------------------------------------
 void PhotonMapping::preprocess()
 {
+
+	// Muestrea las fuentes de luz de la escena
+	for(int i = 0; i < world->nb_lights(); i++){
+		
+		// Obtiene la fuente de luz i-esima
+		Vector3 lightPos = world->light(i).get_position();
+		Vector3 lightIntensity = world->light(i).get_intensities();
+		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
+
+		// muestreo
+
+
 }
 
 //*********************************************************************
