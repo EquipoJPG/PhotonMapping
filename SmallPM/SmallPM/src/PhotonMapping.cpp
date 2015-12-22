@@ -149,8 +149,6 @@ void PhotonMapping::preprocess()
 //---------------------------------------------------------------------
 Vector3 PhotonMapping::shade(Intersection &it0)const
 {
-	Vector3 L(0);
-	Intersection it(it0);
 
 	// it es el punto de interseccion
 	// ESTRUCTURA
@@ -161,17 +159,48 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// -----------------------------------------------------------
 	// Debugueo: poner por separado ID e II
 
+	Vector3 L(0);	// color inicial (fondo negro) ->>>>> mirar funcion get_background() de world.h
+	Intersection it(it0);
+	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
+	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
 
-	// punto : it.get_position()
-	// normal : it.get_normal()
-	// material : it.intersected()->material()
-	// luces : world->light(i)
-	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
+	// TERMINO AMBIENTAL
+	//L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
+
+	for(int i = 0; i < world->nb_lights(); i++){
+		
+		// Obtiene la fuente de luz i-esima
+		Vector3 lightPos = world->light(i).get_position();
+		Vector3 lightIntensity = world->light(i).get_intensities();
+		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
+
+		Vector3 shadowRay = Vector3() - lt->get_incoming_direction(pI); // (0,0,0) - lightRay = shadowRay
+		
+		// Si el objeto es visible se calcula la influencia de la luz
+		if (lt->is_visible(pI)) {
+
+			// TERMINO DIFUSO = Kd x Id x (L . N)
+			Vector3 Id = lt->get_incoming_light(pI);
+			Vector3 Kd = it.intersected()->material()->get_albedo(it);
+			float cos = shadowRay.dot(pN);
+			L += Kd * Id * cos;
+		
+			// TERMINO ESPECULAR = Ks x Is x (R . V)^n
+			Vector3 Is = lt->get_incoming_light(pI);
+			Vector3 Ks = it.intersected()->material()->get_albedo(it);
+			Vector3 V = it.get_ray().get_direction();
+			V = V.normalize();
+			Vector3 R = shadowRay.reflect(pN).normalize();
+			cos = R.dot(V);
+			if (cos < 0.0) cos = 0.0;
+
+			L += Ks * Is * pow(cos,80);
+
+		}
+	}
+	
 	return L;
-	//for(int i = 0; i < world->nb_lights(); i++){
-		//world->light(i);
-	//}
-
+	
 	//**********************************************************************
 	// The following piece of code is included here for two reasons: first
 	// it works as a 'hello world' code to check that everthing compiles 
