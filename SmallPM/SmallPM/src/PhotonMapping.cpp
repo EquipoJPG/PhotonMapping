@@ -18,6 +18,9 @@ In no event shall copyright holders be liable for any damage.
 #include "BSDF.h"
 #include <math.h>
 
+KDTree<Photon,3> global_photons;
+KDTree<Photon,3> caustic_photons;
+
 //*********************************************************************
 // Compute the photons by tracing the Ray 'r' from the light source
 // through the scene, and by storing the intersections with matter
@@ -141,6 +144,8 @@ double fRand(double fMin, double fMax)
 //---------------------------------------------------------------------
 void PhotonMapping::preprocess()
 {
+	global_photons = KDTree<Photon,3>::KDTree();
+	caustic_photons = KDTree<Photon,3>::KDTree();
 
 	// Muestrea las fuentes de luz de la escena
 	for(int i = 0; i < world->nb_lights(); i++){
@@ -174,6 +179,7 @@ void PhotonMapping::preprocess()
 			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
 			// Almacena las colisiones en el KD-Tree
+			
 			
 			// Actualiza el numero de fotones muestreados - trace_ray parece ya aumentarlo cada vez D:
 			// m_nb_current_shots++;
