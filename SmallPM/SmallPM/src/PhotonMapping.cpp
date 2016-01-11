@@ -174,8 +174,7 @@ void PhotonMapping::preprocess()
 			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
 			// Almacena las colisiones en el KD-Tree
-
-
+			
 			// Actualiza el numero de fotones muestreados - trace_ray parece ya aumentarlo cada vez D:
 			// m_nb_current_shots++;
 		}
@@ -210,7 +209,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
 
 	// TERMINO AMBIENTAL
-	//L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
+	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
 
 	// LUZ DIRECTA //
 	for(int i = 0; i < world->nb_lights(); i++){
@@ -246,6 +245,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	}
 
 	// LUZ INDIRECTA //
+	// estimacion de radiancia: lo de los circulacos
 	
 	return L;
 	
