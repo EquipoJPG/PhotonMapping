@@ -152,10 +152,11 @@ void PhotonMapping::preprocess()
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
 		Vector3 photonFlux(1);	// energia foton = 1, color blanco
 
-		// Muestreo de una esfera
+		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
+		// de la esfera. El numero de fotones lanzados es el maximo definido por
+		// la variable 'm_max_nb_shots'
 		while (seguir)
 		{
-
 			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
 			double omega(fRand(0.0,2 * 3.14));
 			double theta(fRand(0.0,2 * 3.14));
@@ -275,9 +276,12 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	}
 
 	// LUZ INDIRECTA //
-	// estimacion de radiancia: lo de los circulacos
+	// Estimacion de radiancia: lo de los circulacos
 
 
+	// TODO: Obtiene los fotones almacenados en el KDTree
+
+	// TODO: Ecuacion de RENDER para cada foton recuperado
 	
 	return L;
 	
