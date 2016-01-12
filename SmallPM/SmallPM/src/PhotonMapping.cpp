@@ -285,9 +285,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// pI = punto de interseccion (x,y,z)
 	// pN = normal en el punto de interseccion
 	std::vector<Real> intersection = std::vector<Real>();
-	intersection.push_back(photon.position.getComponent(0));
-	intersection.push_back(photon.position.getComponent(1));
-	intersection.push_back(photon.position.getComponent(2));
+	intersection.push_back(pI.getComponent(0));
+	intersection.push_back(pI.getComponent(1));
+	intersection.push_back(pI.getComponent(2));
 
 	// Fotones difusos
 	// globalPhotons = m_global_map.find(intersection, );
