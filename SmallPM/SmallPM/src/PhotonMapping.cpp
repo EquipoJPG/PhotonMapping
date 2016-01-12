@@ -18,9 +18,6 @@ In no event shall copyright holders be liable for any damage.
 #include "BSDF.h"
 #include <math.h>
 
-KDTree<Photon,3> global_photons;
-KDTree<Photon,3> caustic_photons;
-
 //*********************************************************************
 // Compute the photons by tracing the Ray 'r' from the light source
 // through the scene, and by storing the intersections with matter
@@ -144,19 +141,19 @@ double fRand(double fMin, double fMax)
 //---------------------------------------------------------------------
 void PhotonMapping::preprocess()
 {
-	global_photons = KDTree<Photon,3>::KDTree();
-	caustic_photons = KDTree<Photon,3>::KDTree();
-
 	// Muestrea las fuentes de luz de la escena
 	for(int i = 0; i < world->nb_lights(); i++){
+
+		bool seguir = true;
 		
 		// Obtiene la fuente de luz i-esima
 		Vector3 lightPos = world->light(i).get_position();
 		Vector3 lightIntensity = world->light(i).get_intensities();
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
+		Vector3 photonFlux(1);	// energia foton = 1, color blanco
 
 		// Muestreo de una esfera
-		while (m_nb_current_shots < m_max_nb_shots )
+		while (seguir)
 		{
 
 			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
@@ -170,21 +167,48 @@ void PhotonMapping::preprocess()
 			Vector3 photonDir(x,y,z);
 
 			// Crea el rayo (foton) a lanzar
-			Vector3 photonFlux(1);	// energia foton = 1
 			Ray* photonRay = new Ray(lightPos, photonDir);
 
 			// Lanza los fotones muestreados
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
-			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
+			seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
-			// Almacena las colisiones en el KD-Tree
-			
-			
-			// Actualiza el numero de fotones muestreados - trace_ray parece ya aumentarlo cada vez D:
-			// m_nb_current_shots++;
+			// Almacena las colisiones de los fotones difusos
+			int i;
+			for (i = 0; i < globalPhotons.size(); i++) {
+
+				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+				Photon photon = globalPhotons.front();
+
+				std::vector<Real> photonPosition = std::vector<Real>();
+				photonPosition.push_back(photon.position.getComponent(0));
+				photonPosition.push_back(photon.position.getComponent(1));
+				photonPosition.push_back(photon.position.getComponent(2));
+				
+				m_global_map.store(photonPosition, photon);
+
+				globalPhotons.pop_front(); // elimina el foton almacenado de la lista
+			}
+
+			// Almacena las colisiones de los fotones causticos
+			for (i = 0; i < causticPhotons.size(); i++) {
+
+				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+				Photon photon = causticPhotons.front();
+
+				std::vector<Real> photonPosition = std::vector<Real>();
+				photonPosition.push_back(photon.position.getComponent(0));
+				photonPosition.push_back(photon.position.getComponent(1));
+				photonPosition.push_back(photon.position.getComponent(2));
+				
+				m_caustics_map.store(photonPosition, photon);
+
+				causticPhotons.pop_front(); // elimina el foton almacenado de la lista
+			}
 		}
 	}
+	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
 }
 
 //*********************************************************************
@@ -252,6 +276,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	// LUZ INDIRECTA //
 	// estimacion de radiancia: lo de los circulacos
+
+
 	
 	return L;
 	

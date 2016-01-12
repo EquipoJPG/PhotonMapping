@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
 	//
 	World*  w = new World;
   
-	w->set_ambient(Vector3(0,0,0));
+	w->set_ambient(Vector3(0.1,0.1,0.1));
 
 	BSDF* glass = new Transmissive(w, 1.5);
 	BSDF* mirror = new Specular(w);
