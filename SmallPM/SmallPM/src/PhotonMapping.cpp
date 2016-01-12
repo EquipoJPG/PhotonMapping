@@ -150,7 +150,7 @@ void PhotonMapping::preprocess()
 		Vector3 lightPos = world->light(i).get_position();
 		Vector3 lightIntensity = world->light(i).get_intensities();
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
-		Vector3 photonFlux(1);	// energia foton = 1, color blanco
+		Vector3 photonFlux(lightIntensity);	// energia foton = lightIntensity
 
 		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
@@ -281,7 +281,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	// TODO: Obtiene los fotones almacenados en el KDTree
 
+
 	// TODO: Ecuacion de RENDER para cada foton recuperado
+
 	
 	return L;
 	
