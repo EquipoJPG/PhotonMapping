@@ -278,9 +278,54 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// LUZ INDIRECTA //
 	// Estimacion de radiancia: lo de los circulacos
 
+	// TODO: Obtiene todos los fotones almacenados en el KDTree
+	std::list<Photon> globalPhotons;
+	std::list<Photon> causticPhotons;
 
-	// TODO: Obtiene los fotones almacenados en el KDTree
+	// pI = punto de interseccion (x,y,z)
+	// pN = normal en el punto de interseccion
+	std::vector<Real> intersection = std::vector<Real>();
+	intersection.push_back(photon.position.getComponent(0));
+	intersection.push_back(photon.position.getComponent(1));
+	intersection.push_back(photon.position.getComponent(2));
 
+	// Fotones difusos
+	// globalPhotons = m_global_map.find(intersection, );
+
+	// Fotones causticos
+	// causticPhotons = m_caustics_map.find();
+
+	int i;
+	for (i = 0; i < globalPhotons.size(); i++) {
+
+		// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+		Photon photon = globalPhotons.front();
+
+		std::vector<Real> photonPosition = std::vector<Real>();
+		photonPosition.push_back(photon.position.getComponent(0));
+		photonPosition.push_back(photon.position.getComponent(1));
+		photonPosition.push_back(photon.position.getComponent(2));
+				
+		m_global_map.store(photonPosition, photon);
+
+		globalPhotons.pop_front(); // elimina el foton almacenado de la lista
+	}
+
+	// Almacena las colisiones de los fotones causticos
+	for (i = 0; i < causticPhotons.size(); i++) {
+
+		// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+		Photon photon = causticPhotons.front();
+
+		std::vector<Real> photonPosition = std::vector<Real>();
+		photonPosition.push_back(photon.position.getComponent(0));
+		photonPosition.push_back(photon.position.getComponent(1));
+		photonPosition.push_back(photon.position.getComponent(2));
+				
+		m_caustics_map.store(photonPosition, photon);
+
+		causticPhotons.pop_front(); // elimina el foton almacenado de la lista
+	}
 
 	// TODO: Ecuacion de RENDER para cada foton recuperado
 
