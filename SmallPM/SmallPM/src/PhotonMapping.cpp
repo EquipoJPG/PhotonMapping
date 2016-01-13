@@ -275,13 +275,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		}
 	}
 
-	// LUZ INDIRECTA //
-	// Estimacion de radiancia: lo de los circulacos
-
-	// TODO: Obtiene todos los fotones almacenados en el KDTree
-	std::list<Photon> globalPhotons;
-	std::list<Photon> causticPhotons;
-
+	// LUZ INDIRECTA (Estimacion de radiancia) //
 	// pI = punto de interseccion (x,y,z)
 	// pN = normal en el punto de interseccion
 	std::vector<Real> intersection = std::vector<Real>();
@@ -289,46 +283,42 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	intersection.push_back(pI.getComponent(1));
 	intersection.push_back(pI.getComponent(2));
 
-	// Fotones difusos
-	// globalPhotons = m_global_map.find(intersection, );
+	// FOTONES DIFUSOS
+	// Busca los fotones cercanos y los guarda en nearest_photons
+	std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
+	Real max_distance = 10;
+	int nb_photons = 5;
+	m_global_map.find(intersection, nb_photons, nearest_photons, max_distance);
 
-	// Fotones causticos
-	// causticPhotons = m_caustics_map.find();
-
+	// TODO: ECUACION DE RENDER para cada foton recuperado
+	Real farest_photon = 0;
+	Vector3 sumatorio = Vector3(0);
 	int i;
-	for (i = 0; i < globalPhotons.size(); i++) {
+	for (i = 0; i < nearest_photons.size(); i++) {
 
-		// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
-		Photon photon = globalPhotons.front();
+		// Obtiene la informacion de un foton
+		Photon photon = nearest_photons.at(i)->data();
+		Vector3 position = photon.position;
+		//Vector3 direction = photon.direction;
+		//Vector3 flux = photon.flux;
 
-		std::vector<Real> photonPosition = std::vector<Real>();
-		photonPosition.push_back(photon.position.getComponent(0));
-		photonPosition.push_back(photon.position.getComponent(1));
-		photonPosition.push_back(photon.position.getComponent(2));
-				
-		m_global_map.store(photonPosition, photon);
+		// Calcula la distancia a la que se encuentra el foton de pI
+		Real x = abs(position.getComponent(0) - pI.getComponent(0));
+		Real y = abs(position.getComponent(1) - pI.getComponent(1));
+		Real z = abs(position.getComponent(2) - pI.getComponent(2));
+		Real distance = Vector3(x,y,z).length2();
 
-		globalPhotons.pop_front(); // elimina el foton almacenado de la lista
+		if (distance > farest_photon) {
+			farest_photon = distance;
+		}
+
+		/// ECUACION DE RENDER (suma de flujos de fotones) ///
+		sumatorio += photon.flux;
 	}
-
-	// Almacena las colisiones de los fotones causticos
-	for (i = 0; i < causticPhotons.size(); i++) {
-
-		// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
-		Photon photon = causticPhotons.front();
-
-		std::vector<Real> photonPosition = std::vector<Real>();
-		photonPosition.push_back(photon.position.getComponent(0));
-		photonPosition.push_back(photon.position.getComponent(1));
-		photonPosition.push_back(photon.position.getComponent(2));
-				
-		m_caustics_map.store(photonPosition, photon);
-
-		causticPhotons.pop_front(); // elimina el foton almacenado de la lista
-	}
-
-	// TODO: Ecuacion de RENDER para cada foton recuperado
-
+	// Calcula el area de un circulo de radio la distancia del foton
+	// mas lejano (de los cercanos) respecto al punto de interseccion
+	Real area = 3.14 * std::pow(farest_photon, 2);
+	L += sumatorio / area;
 	
 	return L;
 	
