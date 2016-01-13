@@ -154,7 +154,9 @@ void PhotonMapping::preprocess()
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
 		// la variable 'm_max_nb_shots'
 		//while (seguir)
-		for(int j = 0; j < m_max_nb_shots; j++)
+		//for(int j = 0; j < m_max_nb_shots; j++)
+		bool seguir = true;
+		while (seguir)
 		{
 			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
 			double omega(fRand(0.0,2 * 3.14));
@@ -173,8 +175,7 @@ void PhotonMapping::preprocess()
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
 
-			bool seguir = true;
-			while(seguir){
+			//while(seguir){
 				seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
 				// Almacena las colisiones de los fotones difusos
@@ -211,7 +212,6 @@ void PhotonMapping::preprocess()
 				}
 			}
 		}
-	}
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
 	m_global_map.balance();
 	cout << m_global_map.nb_elements() << "\n";
@@ -265,7 +265,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			Vector3 Id = lt->get_incoming_light(pI);
 			Vector3 Kd = it.intersected()->material()->get_albedo(it);
 			float cos = shadowRay.dot(pN);
-			//L += Kd * Id * cos;
+			L += Kd * Id * cos;
 		
 			// TERMINO ESPECULAR = Ks x Is x (R . V)^n
 			Vector3 Is = lt->get_incoming_light(pI);
@@ -276,7 +276,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			cos = R.dot(V);
 			if (cos < 0.0) cos = 0.0;
 
-			//L += Ks * Is * pow(cos,80);
+			L += Ks * Is * pow(cos,80);
 
 		}
 	}
@@ -325,6 +325,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// mas lejano (de los cercanos) respecto al punto de interseccion
 	Real area = 3.14 * std::pow(farest_photon, 2);
 	L += sumatorio / area;
+	L.normalize();
 	//cout << "Farest photon: " << farest_photon << "\n";
 	//cout << "Sumatorio: " << sumatorio.getComponent(0) 
 		//<< " " << sumatorio.getComponent(1) 
