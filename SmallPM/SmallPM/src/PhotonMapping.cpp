@@ -143,8 +143,6 @@ void PhotonMapping::preprocess()
 {
 	// Muestrea las fuentes de luz de la escena
 	for(int i = 0; i < world->nb_lights(); i++){
-
-		bool seguir = true;
 		
 		// Obtiene la fuente de luz i-esima
 		Vector3 lightPos = world->light(i).get_position();
@@ -155,7 +153,8 @@ void PhotonMapping::preprocess()
 		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
 		// la variable 'm_max_nb_shots'
-		while (seguir)
+		//while (seguir)
+		for(int j = 0; j < m_max_nb_shots; j++)
 		{
 			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
 			double omega(fRand(0.0,2 * 3.14));
@@ -173,45 +172,50 @@ void PhotonMapping::preprocess()
 			// Lanza los fotones muestreados
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
-			seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
-			// Almacena las colisiones de los fotones difusos
-			int i;
-			for (i = 0; i < globalPhotons.size(); i++) {
+			bool seguir = true;
+			while(seguir){
+				seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
-				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
-				Photon photon = globalPhotons.front();
+				// Almacena las colisiones de los fotones difusos
+				int k;
+				for (k = 0; k < globalPhotons.size(); k++) {
 
-				std::vector<Real> photonPosition = std::vector<Real>();
-				photonPosition.push_back(photon.position.getComponent(0));
-				photonPosition.push_back(photon.position.getComponent(1));
-				photonPosition.push_back(photon.position.getComponent(2));
+					// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+					Photon photon = globalPhotons.front();
+
+					std::vector<Real> photonPosition = std::vector<Real>();
+					photonPosition.push_back(photon.position.getComponent(0));
+					photonPosition.push_back(photon.position.getComponent(1));
+					photonPosition.push_back(photon.position.getComponent(2));
 				
-				m_global_map.store(photonPosition, photon);
+					m_global_map.store(photonPosition, photon);
 
-				globalPhotons.pop_front(); // elimina el foton almacenado de la lista
-			}
+					globalPhotons.pop_front(); // elimina el foton almacenado de la lista
+				}
 
-			// Almacena las colisiones de los fotones causticos
-			for (i = 0; i < causticPhotons.size(); i++) {
+				// Almacena las colisiones de los fotones causticos
+				for (k = 0; k < causticPhotons.size(); k++) {
 
-				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
-				Photon photon = causticPhotons.front();
+					// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+					Photon photon = causticPhotons.front();
 
-				std::vector<Real> photonPosition = std::vector<Real>();
-				photonPosition.push_back(photon.position.getComponent(0));
-				photonPosition.push_back(photon.position.getComponent(1));
-				photonPosition.push_back(photon.position.getComponent(2));
+					std::vector<Real> photonPosition = std::vector<Real>();
+					photonPosition.push_back(photon.position.getComponent(0));
+					photonPosition.push_back(photon.position.getComponent(1));
+					photonPosition.push_back(photon.position.getComponent(2));
 				
-				m_caustics_map.store(photonPosition, photon);
+					m_caustics_map.store(photonPosition, photon);
 
-				causticPhotons.pop_front(); // elimina el foton almacenado de la lista
+					causticPhotons.pop_front(); // elimina el foton almacenado de la lista
+				}
 			}
 		}
 	}
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
 	m_global_map.balance();
-	m_caustics_map.balance();
+	cout << m_global_map.nb_elements() << "\n";
+	//m_caustics_map.balance();
 }
 
 //*********************************************************************
@@ -261,7 +265,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			Vector3 Id = lt->get_incoming_light(pI);
 			Vector3 Kd = it.intersected()->material()->get_albedo(it);
 			float cos = shadowRay.dot(pN);
-			L += Kd * Id * cos;
+			//L += Kd * Id * cos;
 		
 			// TERMINO ESPECULAR = Ks x Is x (R . V)^n
 			Vector3 Is = lt->get_incoming_light(pI);
@@ -272,7 +276,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			cos = R.dot(V);
 			if (cos < 0.0) cos = 0.0;
 
-			L += Ks * Is * pow(cos,80);
+			//L += Ks * Is * pow(cos,80);
 
 		}
 	}
@@ -288,8 +292,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// FOTONES DIFUSOS
 	// Busca los fotones cercanos y los guarda en nearest_photons
 	std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
-	Real max_distance = 10;
-	int nb_photons = 5;
+	Real max_distance = 100;
+	int nb_photons = 10;	// 50, 500... Tarda mas, eso si
 	m_global_map.find(intersection, nb_photons, nearest_photons, max_distance);
 
 	// TODO: ECUACION DE RENDER para cada foton recuperado
@@ -315,12 +319,16 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		}
 
 		/// ECUACION DE RENDER (suma de flujos de fotones) ///
-		sumatorio += photon.flux;
+		sumatorio += photon.flux.normalize() * it.intersected()->material()->get_albedo(it);
 	}
 	// Calcula el area de un circulo de radio la distancia del foton
 	// mas lejano (de los cercanos) respecto al punto de interseccion
 	Real area = 3.14 * std::pow(farest_photon, 2);
 	L += sumatorio / area;
+	//cout << "Farest photon: " << farest_photon << "\n";
+	//cout << "Sumatorio: " << sumatorio.getComponent(0) 
+		//<< " " << sumatorio.getComponent(1) 
+		//<< " " << sumatorio.getComponent(2) << "\n";
 	
 	return L;
 	
