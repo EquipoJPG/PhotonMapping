@@ -210,6 +210,8 @@ void PhotonMapping::preprocess()
 		}
 	}
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
+	m_global_map.balance();
+	m_caustics_map.balance();
 }
 
 //*********************************************************************
