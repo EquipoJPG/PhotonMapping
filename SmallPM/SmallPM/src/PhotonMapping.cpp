@@ -153,7 +153,6 @@ void PhotonMapping::preprocess()
 		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
 		// la variable 'm_max_nb_shots'
-		//while (seguir)
 		//for(int j = 0; j < m_max_nb_shots; j++)
 		bool seguir = true;
 		while (seguir)
@@ -281,6 +280,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		}
 	}
 
+	L = L.normalize();
+
 	// LUZ INDIRECTA (Estimacion de radiancia) //
 	// pI = punto de interseccion (x,y,z)
 	// pN = normal en el punto de interseccion
@@ -292,8 +293,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// FOTONES DIFUSOS
 	// Busca los fotones cercanos y los guarda en nearest_photons
 	std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
-	Real max_distance = 100;
-	int nb_photons = 10;	// 50, 500... Tarda mas, eso si
+	Real max_distance = 1000;
+	int nb_photons = 50;	// 50, 500... Tarda mas, eso si
 	m_global_map.find(intersection, nb_photons, nearest_photons, max_distance);
 
 	// TODO: ECUACION DE RENDER para cada foton recuperado
@@ -319,18 +320,18 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		}
 
 		/// ECUACION DE RENDER (suma de flujos de fotones) ///
-		sumatorio += photon.flux.normalize() * it.intersected()->material()->get_albedo(it);
+		sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
 	}
 	// Calcula el area de un circulo de radio la distancia del foton
 	// mas lejano (de los cercanos) respecto al punto de interseccion
 	Real area = 3.14 * std::pow(farest_photon, 2);
 	L += sumatorio / area;
-	L.normalize();
 	//cout << "Farest photon: " << farest_photon << "\n";
 	//cout << "Sumatorio: " << sumatorio.getComponent(0) 
 		//<< " " << sumatorio.getComponent(1) 
 		//<< " " << sumatorio.getComponent(2) << "\n";
 	
+	L = L.normalize();
 	return L;
 	
 	//**********************************************************************
