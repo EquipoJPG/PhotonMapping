@@ -150,7 +150,8 @@ void PhotonMapping::preprocess()
 		Vector3 lightPos = world->light(i).get_position();
 		Vector3 lightIntensity = world->light(i).get_intensities();
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
-		Vector3 photonFlux(lightIntensity);	// energia foton = lightIntensity
+		Vector3 photonFlux(lightIntensity / lightIntensity);	// energia foton = lightIntensity
+		//Vector3 photonFlux(lightIntensity / m_max_nb_shots);	// energia foton = lightIntensity / total fotones
 
 		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
