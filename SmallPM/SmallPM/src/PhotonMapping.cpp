@@ -177,51 +177,44 @@ void PhotonMapping::preprocess()
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
 
-			//while(seguir){
-			//Ray deltaPhotonRay(*photonRay);
-			//Intersection it;
-			//while () {
+			seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
-				//world->first_intersection(deltaPhotonRay, it);
+			// Almacena las colisiones de los fotones difusos
+			int k;
+			for (k = 0; k < globalPhotons.size(); k++) {
+				gp++;
 
-				seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
+				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+				Photon photon = globalPhotons.front();
 
-				// Almacena las colisiones de los fotones difusos
-				int k;
-				for (k = 0; k < globalPhotons.size(); k++) {
-					gp++;
-
-					// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
-					Photon photon = globalPhotons.front();
-
-					std::vector<Real> photonPosition = std::vector<Real>();
-					photonPosition.push_back(photon.position.getComponent(0));
-					photonPosition.push_back(photon.position.getComponent(1));
-					photonPosition.push_back(photon.position.getComponent(2));
+				std::vector<Real> photonPosition = std::vector<Real>();
+				photonPosition.push_back(photon.position.getComponent(0));
+				photonPosition.push_back(photon.position.getComponent(1));
+				photonPosition.push_back(photon.position.getComponent(2));
 				
-					m_global_map.store(photonPosition, photon);
+				m_global_map.store(photonPosition, photon);
 
-					globalPhotons.pop_front(); // elimina el foton almacenado de la lista
-				}
+				globalPhotons.pop_front(); // elimina el foton almacenado de la lista
+			}
 
-				// Almacena las colisiones de los fotones causticos
-				for (k = 0; k < causticPhotons.size(); k++) {
-					cp++;
+			// Almacena las colisiones de los fotones causticos
+			for (k = 0; k < causticPhotons.size(); k++) {
+				cp++;
 
-					// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
-					Photon photon = causticPhotons.front();
+				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+				Photon photon = causticPhotons.front();
 
-					std::vector<Real> photonPosition = std::vector<Real>();
-					photonPosition.push_back(photon.position.getComponent(0));
-					photonPosition.push_back(photon.position.getComponent(1));
-					photonPosition.push_back(photon.position.getComponent(2));
+				std::vector<Real> photonPosition = std::vector<Real>();
+				photonPosition.push_back(photon.position.getComponent(0));
+				photonPosition.push_back(photon.position.getComponent(1));
+				photonPosition.push_back(photon.position.getComponent(2));
 				
-					m_caustics_map.store(photonPosition, photon);
+				m_caustics_map.store(photonPosition, photon);
 
-					causticPhotons.pop_front(); // elimina el foton almacenado de la lista
-				}
+				causticPhotons.pop_front(); // elimina el foton almacenado de la lista
 			}
 		}
+	}
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
 	if(gp > 0){
 		m_global_map.balance();
@@ -259,6 +252,21 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
 	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
 
+	// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
+	int MAX_REB = 3;
+	int rebotes = 0;
+	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
+
+		// Rayo rebotado
+		Ray newRay;
+		Real pdf;
+		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf );
+
+		// Nueva interseccion
+		world->first_intersection(newRay, it);
+		rebotes++;
+	}
+
 	// TERMINO AMBIENTAL
 	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
 
@@ -271,7 +279,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
 
 		Vector3 shadowRay = Vector3() - lt->get_incoming_direction(pI); // (0,0,0) - lightRay = shadowRay
-		
+
 		// Si el objeto es visible se calcula la influencia de la luz
 		if (lt->is_visible(pI)) {
 
@@ -291,7 +299,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			if (cos < 0.0) cos = 0.0;
 
 			L += Ks * Is * pow(cos,80);
-
+				
 		}
 	}
 
