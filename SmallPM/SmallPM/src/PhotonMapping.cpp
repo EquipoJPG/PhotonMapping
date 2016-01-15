@@ -178,6 +178,12 @@ void PhotonMapping::preprocess()
 			std::list<Photon> causticPhotons;
 
 			//while(seguir){
+			//Ray deltaPhotonRay(*photonRay);
+			//Intersection it;
+			//while () {
+
+				//world->first_intersection(deltaPhotonRay, it);
+
 				seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
 				// Almacena las colisiones de los fotones difusos
