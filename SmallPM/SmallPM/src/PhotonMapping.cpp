@@ -249,7 +249,6 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	Vector3 L(0);	// color inicial (fondo negro) ->>>>> mirar funcion get_background() de world.h
 	Intersection it(it0);
-	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
 	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
 
 	// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
@@ -268,7 +267,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	}
 
 	newRay = Ray(newRay.get_origin(), newRay.get_direction());
-	world->first_intersection(newRay, it);
+	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
 
 	// TERMINO AMBIENTAL
 	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
