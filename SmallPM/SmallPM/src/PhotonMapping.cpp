@@ -317,13 +317,12 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// Busca los fotones cercanos y los guarda en nearest_photons
 	std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
 	Real max_distance;
-	int nb_photons = 10;	// 50, 500... Tarda mas, eso si (TODO: estan las vars en el main)
 	Vector3 sumatorio = Vector3(0);
 	int i;
 	Real area;
 
 	if(!m_global_map.is_empty()){
-		m_global_map.find(intersection, nb_photons, nearest_photons, max_distance);
+		m_global_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
 
 		// TODO: ECUACION DE RENDER para cada foton recuperado
 		for (i = 0; i < nearest_photons.size(); i++) {
@@ -346,7 +345,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	// FOTONES CAUSTICOS
 	if(!m_caustics_map.is_empty()){
-		m_caustics_map.find(intersection, nb_photons, nearest_photons, max_distance);
+		m_caustics_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
 		sumatorio = Vector3(0);
 		for (i = 0; i < nearest_photons.size(); i++) {
 
