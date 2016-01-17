@@ -255,10 +255,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
 	int MAX_REB = 3;
 	int rebotes = 0;
+	Ray newRay;
 	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
 
 		// Rayo rebotado
-		Ray newRay;
 		Real pdf;
 		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf );
 
@@ -266,6 +266,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		world->first_intersection(newRay, it);
 		rebotes++;
 	}
+
+	newRay = Ray(newRay.get_origin(), newRay.get_direction());
+	world->first_intersection(newRay, it);
 
 	// TERMINO AMBIENTAL
 	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
