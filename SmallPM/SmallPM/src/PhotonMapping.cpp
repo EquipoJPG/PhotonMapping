@@ -161,8 +161,8 @@ void PhotonMapping::preprocess()
 		while (seguir)
 		{
 			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
-			double omega(fRand(0.0,2 * 3.14));
-			double theta(fRand(0.0,2 * 3.14));
+			double omega(fRand(0.0,2 * 3.14159));
+			double theta(fRand(0.0,2 * 3.14159));
 			
 			// Calcula la direccion en base a dos angulos (omega y theta)
 			double x = cos(theta) * sin(omega);
