@@ -170,6 +170,10 @@ void PhotonMapping::preprocess()
 			double z = sin(theta);
 			Vector3 photonDir(x,y,z);
 
+			//cout << "Omega: " << omega << ", Theta: " << theta << "\n";
+			//cout << "(" << x << ", " << y << ", " << z << ")\n";
+			//cout << "====================\n";
+
 			// Crea el rayo (foton) a lanzar
 			Ray* photonRay = new Ray(lightPos, photonDir);
 
