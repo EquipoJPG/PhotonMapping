@@ -256,8 +256,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
 	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
 	
-	// TERMINO AMBIENTAL
-	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
+	if(!it.intersected()->material()->is_delta()){
+		// TERMINO AMBIENTAL
+		L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
+	}
 
 	// LUZ DIRECTA //
 	for(int i = 0; i < world->nb_lights(); i++){
@@ -276,7 +278,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			Vector3 Id = lt->get_incoming_light(pI);
 			Vector3 Kd = it.intersected()->material()->get_albedo(it);
 			float cos = shadowRay.dot(pN);
-			L += Kd * Id * cos;
+			if(!it.intersected()->material()->is_delta()){
+				L += Kd * Id * cos;
+			}
 		
 			// TERMINO ESPECULAR = Ks x Is x (R . V)^n
 			Vector3 Is = lt->get_incoming_light(pI);
@@ -300,7 +304,12 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	int MAX_REB = 3;
 	int rebotes = 0;
 	Ray newRay;
+	Intersection anterior = it;
+	bool hit = true;
+	bool entrado = false;
 	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
+		entrado = true;
+		anterior = it;
 
 		// Rayo rebotado
 		Real pdf;
@@ -308,10 +317,22 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 		// Nueva interseccion
 		world->first_intersection(newRay, it);
+		if(!it.did_hit()) {
+			it = anterior;
+			hit = false;
+			break;
+		}
+		else{
+			newRay = Ray(newRay.get_origin(), newRay.get_direction());
+			world->first_intersection(newRay, it);
+		}
 		rebotes++;
 	}
 
-	newRay = Ray(newRay.get_origin(), newRay.get_direction());
+	if(entrado && hit){
+		newRay = Ray(newRay.get_origin(), newRay.get_direction());
+		world->first_intersection(newRay, it);
+	}
 	pI = it.get_position();	// punto de interseccion (x,y,z)
 	//////////////// FIN DE REBOTES REBIZCOS JAAJA PA K KIERES SABER ESO SALUDOS :D //////////////////
 
@@ -331,14 +352,11 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	if(!m_global_map.is_empty()){
 		m_global_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
 
-		// TODO: ECUACION DE RENDER para cada foton recuperado
 		for (i = 0; i < nearest_photons.size(); i++) {
 
 			// Obtiene la informacion de un foton
 			Photon photon = nearest_photons.at(i)->data();
 			Vector3 position = photon.position;
-			//Vector3 direction = photon.direction;
-			//Vector3 flux = photon.flux;
 
 			/// ECUACION DE RENDER (suma de flujos de fotones) ///
 			sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
@@ -358,8 +376,6 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Obtiene la informacion de un foton
 			Photon photon = nearest_photons.at(i)->data();
 			Vector3 position = photon.position;
-			//Vector3 direction = photon.direction;
-			//Vector3 flux = photon.flux;
 
 			/// ECUACION DE RENDER (suma de flujos de fotones) ///
 			sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
