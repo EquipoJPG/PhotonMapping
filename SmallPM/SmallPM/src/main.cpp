@@ -51,8 +51,8 @@ int main(int argc, char* argv[])
 	// TODO cambiar scene para cambiar la escena XD
 	unsigned int scene = 1;
 
-	unsigned int photons_global = 50000, 
-				 photons_caustic = 50000, 
+	unsigned int photons_global = 10000, 
+				 photons_caustic = 10000, 
 				 max_shots = 100000, 
 				 nb_nearest_photons = 10;
 

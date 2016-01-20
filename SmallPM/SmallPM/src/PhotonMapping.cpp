@@ -150,8 +150,8 @@ void PhotonMapping::preprocess()
 		Vector3 lightPos = world->light(i).get_position();
 		Vector3 lightIntensity = world->light(i).get_intensities();
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
-		Vector3 photonFlux(lightIntensity / lightIntensity);	// energia foton = lightIntensity
-		//Vector3 photonFlux(lightIntensity / m_max_nb_shots);	// energia foton = lightIntensity / total fotones
+		//Vector3 photonFlux(lightIntensity / lightIntensity);	// energia foton = lightIntensity
+		Vector3 photonFlux(lightIntensity / m_max_nb_shots);	// energia foton = lightIntensity / total fotones
 
 		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
@@ -254,25 +254,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 L(0);	// color inicial (fondo negro) ->>>>> mirar funcion get_background() de world.h
 	Intersection it(it0);
 	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
-
-	// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
-	int MAX_REB = 3;
-	int rebotes = 0;
-	Ray newRay;
-	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
-
-		// Rayo rebotado
-		Real pdf;
-		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf );
-
-		// Nueva interseccion
-		world->first_intersection(newRay, it);
-		rebotes++;
-	}
-
-	newRay = Ray(newRay.get_origin(), newRay.get_direction());
 	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
-
+	
 	// TERMINO AMBIENTAL
 	L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
 
@@ -308,10 +291,30 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				
 		}
 	}
-
+	
 	// LUZ INDIRECTA (Estimacion de radiancia) //
 	// pI = punto de interseccion (x,y,z)
 	// pN = normal en el punto de interseccion
+
+	// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
+	int MAX_REB = 3;
+	int rebotes = 0;
+	Ray newRay;
+	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
+
+		// Rayo rebotado
+		Real pdf;
+		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf );
+
+		// Nueva interseccion
+		world->first_intersection(newRay, it);
+		rebotes++;
+	}
+
+	newRay = Ray(newRay.get_origin(), newRay.get_direction());
+	pI = it.get_position();	// punto de interseccion (x,y,z)
+	//////////////// FIN DE REBOTES REBIZCOS JAAJA PA K KIERES SABER ESO SALUDOS :D //////////////////
+
 	std::vector<Real> intersection = std::vector<Real>();
 	intersection.push_back(pI.getComponent(0));
 	intersection.push_back(pI.getComponent(1));
@@ -324,7 +327,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 sumatorio = Vector3(0);
 	int i;
 	Real area;
-
+	
 	if(!m_global_map.is_empty()){
 		m_global_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
 
@@ -346,7 +349,6 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		L += sumatorio / area;
 	}
 	/////////////////////////////////////////////////////////////////////////
-
 	// FOTONES CAUSTICOS
 	if(!m_caustics_map.is_empty()){
 		m_caustics_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
@@ -368,6 +370,13 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		L += sumatorio / area;
 	}
 	////////////////////////////////////////////////////////////////////////
+	
+	//cout << "Area: " << area << "\n";
+	//cout << "Nearest photons: " << nearest_photons.size() << "\n";
+
+	//cout << "Luz final(rojo): " << L.getComponent(0) << "\n";
+	//cout << "Luz final(verde): " << L.getComponent(1) << "\n";
+	//cout << "Luz final(azul): " << L.getComponent(2) << "\n";
 
 	return L;
 	
