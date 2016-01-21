@@ -157,8 +157,7 @@ void PhotonMapping::preprocess()
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
 		// la variable 'm_max_nb_shots'
 		//for(int j = 0; j < m_max_nb_shots; j++)
-		bool seguir = true;
-		while (seguir)
+		while (m_nb_current_shots < m_max_nb_shots)
 		{
 
 			// REJECTION SAMPLING
@@ -193,7 +192,7 @@ void PhotonMapping::preprocess()
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
 
-			seguir = trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
+			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
 
 			// Almacena las colisiones de los fotones difusos
 			int k;
@@ -263,16 +262,34 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// -----------------------------------------------------------
 	// Debugueo: poner por separado ID e II
 
-	Vector3 L(0);	// color inicial (fondo negro) ->>>>> mirar funcion get_background() de world.h
+	Vector3 L(world->get_background());	// color inicial (fondo negro) ->>>>> mirar funcion get_background() de world.h
 	Intersection it(it0);
 	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
 	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
-	
-	if(!it.intersected()->material()->is_delta()){
-		// TERMINO AMBIENTAL
-		L = world->get_ambient() * it.intersected()->material()->get_albedo(it);
+
+		// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
+	int MAX_REB = 3;
+	int rebotes = 0;
+	Ray newRay;
+
+	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
+
+		// Rayo rebotado
+		Real pdf;
+		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf );
+
+		// Nueva interseccion
+		newRay.shift();
+		world->first_intersection(newRay, it);
+		rebotes++;
 	}
 
+	pI = it.get_position();	// punto de interseccion (x,y,z)
+	//////////////// FIN DE REBOTES REBIZCOS JAAJA PA K KIERES SABER ESO SALUDOS :D //////////////////
+	
+	// TERMINO AMBIENTAL
+	L += world->get_ambient() * it.intersected()->material()->get_albedo(it);
+	
 	// LUZ DIRECTA //
 	for(int i = 0; i < world->nb_lights(); i++){
 		
@@ -285,68 +302,19 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 		// Si el objeto es visible se calcula la influencia de la luz
 		if (lt->is_visible(pI)) {
-
 			// TERMINO DIFUSO = Kd x Id x (L . N)
 			Vector3 Id = lt->get_incoming_light(pI);
 			Vector3 Kd = it.intersected()->material()->get_albedo(it);
 			float cos = shadowRay.dot(pN);
-			if(!it.intersected()->material()->is_delta()){
-				L += Kd * Id * cos;
-			}
-		
-			// TERMINO ESPECULAR = Ks x Is x (R . V)^n
-			Vector3 Is = lt->get_incoming_light(pI);
-			Vector3 Ks = it.intersected()->material()->get_albedo(it);
-			Vector3 V = it.get_ray().get_direction();
-			V = V.normalize();
-			Vector3 R = shadowRay.reflect(pN).normalize();
-			cos = R.dot(V);
-			if (cos < 0.0) cos = 0.0;
+			L += Kd * Id * cos;
 
-			L += Ks * Is * pow(cos,80);					//////////////// EXPONENTE ESPECULAR (DISPERSION) ESTA HARDCODED (REVISAR)
-				
+			// TERMINO ESPECULAR: no hay porque son superficies lambertianas
 		}
 	}
 	
 	// LUZ INDIRECTA (Estimacion de radiancia) //
 	// pI = punto de interseccion (x,y,z)
 	// pN = normal en el punto de interseccion
-
-	// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
-	int MAX_REB = 3;
-	int rebotes = 0;
-	Ray newRay;
-	Intersection anterior = it;
-	bool hit = true;
-	bool entrado = false;
-	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
-		entrado = true;
-		anterior = it;
-
-		// Rayo rebotado
-		Real pdf;
-		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf );
-
-		// Nueva interseccion
-		world->first_intersection(newRay, it);
-		if(!it.did_hit()) {
-			it = anterior;
-			hit = false;
-			break;
-		}
-		else{
-			newRay = Ray(newRay.get_origin(), newRay.get_direction());
-			world->first_intersection(newRay, it);
-		}
-		rebotes++;
-	}
-
-	if(entrado && hit){
-		newRay = Ray(newRay.get_origin(), newRay.get_direction());
-		world->first_intersection(newRay, it);
-	}
-	pI = it.get_position();	// punto de interseccion (x,y,z)
-	//////////////// FIN DE REBOTES REBIZCOS JAAJA PA K KIERES SABER ESO SALUDOS :D //////////////////
 
 	std::vector<Real> intersection = std::vector<Real>();
 	intersection.push_back(pI.getComponent(0));
