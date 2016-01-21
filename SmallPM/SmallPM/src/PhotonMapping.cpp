@@ -156,7 +156,6 @@ void PhotonMapping::preprocess()
 		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
 		// la variable 'm_max_nb_shots'
-		//for(int j = 0; j < m_max_nb_shots; j++)
 		while (m_nb_current_shots < m_max_nb_shots)
 		{
 
@@ -170,17 +169,6 @@ void PhotonMapping::preprocess()
 			
 			Vector3 photonDir(x,y,z);
 			
-			/*
-			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
-			double omega(fRand(0.0,2 * 3.14159));
-			double theta(fRand(0.0,2 * 3.14159));
-			
-			// Calcula la direccion en base a dos angulos (omega y theta)
-			double x = cos(theta) * sin(omega);
-			double y = cos(theta) * cos(omega);
-			double z = sin(theta);
-			Vector3 photonDir(x,y,z);
-			*/
 			//cout << "Omega: " << omega << ", Theta: " << theta << "\n";
 			//cout << "(" << x << ", " << y << ", " << z << ")\n";
 			//cout << "====================\n";
@@ -285,6 +273,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	}
 
 	pI = it.get_position();	// punto de interseccion (x,y,z)
+	pN = it.get_normal();
 	//////////////// FIN DE REBOTES REBIZCOS JAAJA PA K KIERES SABER ESO SALUDOS :D //////////////////
 	
 	// TERMINO AMBIENTAL
