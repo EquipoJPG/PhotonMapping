@@ -160,6 +160,18 @@ void PhotonMapping::preprocess()
 		bool seguir = true;
 		while (seguir)
 		{
+
+			// REJECTION SAMPLING
+			double x,y,z;
+			do {
+				x = fRand(-1,1);
+				y = fRand(-1,1);
+				z = fRand(-1,1);
+			} while (pow(x,2) + pow(y,2) + pow(z,2) > 1);
+			
+			Vector3 photonDir(x,y,z);
+			
+			/*
 			// Genera dos angulos aleatoriamente para obtener la direccion del rayo
 			double omega(fRand(0.0,2 * 3.14159));
 			double theta(fRand(0.0,2 * 3.14159));
@@ -169,7 +181,7 @@ void PhotonMapping::preprocess()
 			double y = cos(theta) * cos(omega);
 			double z = sin(theta);
 			Vector3 photonDir(x,y,z);
-
+			*/
 			//cout << "Omega: " << omega << ", Theta: " << theta << "\n";
 			//cout << "(" << x << ", " << y << ", " << z << ")\n";
 			//cout << "====================\n";
@@ -291,7 +303,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			cos = R.dot(V);
 			if (cos < 0.0) cos = 0.0;
 
-			L += Ks * Is * pow(cos,80);
+			L += Ks * Is * pow(cos,80);					//////////////// EXPONENTE ESPECULAR (DISPERSION) ESTA HARDCODED (REVISAR)
 				
 		}
 	}
