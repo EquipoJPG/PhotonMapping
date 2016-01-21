@@ -241,6 +241,11 @@ void PhotonMapping::preprocess()
 //---------------------------------------------------------------------
 Vector3 PhotonMapping::shade(Intersection &it0)const
 {
+	// TODO
+	// debug = 1 LUZ DIRECTA
+	// debug = 2 LUZ INDIRECTA
+	// debug = 3 LUZ DIRECTA + INDIRECTA
+	int debug = 2;
 
 	// ESTRUCTURA
 	// -----------------------------------------------------------
@@ -250,12 +255,12 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// -----------------------------------------------------------
 	// Debugueo: poner por separado ID e II
 
-	Vector3 L(world->get_background());	// color inicial (fondo negro) ->>>>> mirar funcion get_background() de world.h
+	Vector3 L(world->get_background());
 	Intersection it(it0);
 	Vector3 pN = it.get_normal(); // normal en el punto de interseccion
 	Vector3 pI = it.get_position();	// punto de interseccion (x,y,z)
 
-		// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
+	// REBOTAR MIENTRAS EL OBJETO SEA DELTA (hay que llegar a un solido)
 	int MAX_REB = 3;
 	int rebotes = 0;
 	Ray newRay;
@@ -274,94 +279,97 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	pI = it.get_position();	// punto de interseccion (x,y,z)
 	pN = it.get_normal();
-	//////////////// FIN DE REBOTES REBIZCOS JAAJA PA K KIERES SABER ESO SALUDOS :D //////////////////
+	//////////////// FIN DE REBOTES //////////////////
 	
-	// TERMINO AMBIENTAL
-	L += world->get_ambient() * it.intersected()->material()->get_albedo(it);
+	if(debug == 1 || debug == 3){
+		// TERMINO AMBIENTAL
+		L += world->get_ambient() * it.intersected()->material()->get_albedo(it);
 	
-	// LUZ DIRECTA //
-	for(int i = 0; i < world->nb_lights(); i++){
+		// LUZ DIRECTA //
+		for(int i = 0; i < world->nb_lights(); i++){
 		
-		// Obtiene la fuente de luz i-esima
-		Vector3 lightPos = world->light(i).get_position();
-		Vector3 lightIntensity = world->light(i).get_intensities();
-		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
+			// Obtiene la fuente de luz i-esima
+			Vector3 lightPos = world->light(i).get_position();
+			Vector3 lightIntensity = world->light(i).get_intensities();
+			LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
 
-		Vector3 shadowRay = Vector3() - lt->get_incoming_direction(pI); // (0,0,0) - lightRay = shadowRay
+			Vector3 shadowRay = Vector3() - lt->get_incoming_direction(pI); // (0,0,0) - lightRay = shadowRay
 
-		// Si el objeto es visible se calcula la influencia de la luz
-		if (lt->is_visible(pI)) {
-			// TERMINO DIFUSO = Kd x Id x (L . N)
-			Vector3 Id = lt->get_incoming_light(pI);
-			Vector3 Kd = it.intersected()->material()->get_albedo(it);
-			float cos = shadowRay.dot(pN);
-			L += Kd * Id * cos;
+			// Si el objeto es visible se calcula la influencia de la luz
+			if (lt->is_visible(pI)) {
+				// TERMINO DIFUSO = Kd x Id x (L . N)
+				Vector3 Id = lt->get_incoming_light(pI);
+				Vector3 Kd = it.intersected()->material()->get_albedo(it);
+				float cos = shadowRay.dot(pN);
+				L += Kd * Id * cos;
 
-			// TERMINO ESPECULAR: no hay porque son superficies lambertianas
+				// TERMINO ESPECULAR: no hay porque son superficies lambertianas
+			}
 		}
 	}
+	if(debug == 2 || debug == 3){
+		// LUZ INDIRECTA (Estimacion de radiancia) //
+		// pI = punto de interseccion (x,y,z)
+		// pN = normal en el punto de interseccion
+
+		std::vector<Real> intersection = std::vector<Real>();
+		intersection.push_back(pI.getComponent(0));
+		intersection.push_back(pI.getComponent(1));
+		intersection.push_back(pI.getComponent(2));
+
+		// FOTONES DIFUSOS
+		// Busca los fotones cercanos y los guarda en nearest_photons
+		std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
+		Real max_distance;
+		Vector3 sumatorio = Vector3(0);
+		int i;
+		Real area;
 	
-	// LUZ INDIRECTA (Estimacion de radiancia) //
-	// pI = punto de interseccion (x,y,z)
-	// pN = normal en el punto de interseccion
+		if(!m_global_map.is_empty()){
+			m_global_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
 
-	std::vector<Real> intersection = std::vector<Real>();
-	intersection.push_back(pI.getComponent(0));
-	intersection.push_back(pI.getComponent(1));
-	intersection.push_back(pI.getComponent(2));
+			for (i = 0; i < nearest_photons.size(); i++) {
 
-	// FOTONES DIFUSOS
-	// Busca los fotones cercanos y los guarda en nearest_photons
-	std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
-	Real max_distance;
-	Vector3 sumatorio = Vector3(0);
-	int i;
-	Real area;
-	
-	if(!m_global_map.is_empty()){
-		m_global_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
+				// Obtiene la informacion de un foton
+				Photon photon = nearest_photons.at(i)->data();
+				Vector3 position = photon.position;
 
-		for (i = 0; i < nearest_photons.size(); i++) {
-
-			// Obtiene la informacion de un foton
-			Photon photon = nearest_photons.at(i)->data();
-			Vector3 position = photon.position;
-
-			/// ECUACION DE RENDER (suma de flujos de fotones) ///
-			sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
+				/// ECUACION DE RENDER (suma de flujos de fotones) ///
+				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
+			}
+			// Calcula el area de un circulo de radio la distancia del foton
+			// mas lejano (de los cercanos) respecto al punto de interseccion
+			Real area = 3.14 * std::pow(max_distance, 2);
+			L += sumatorio / area;
 		}
-		// Calcula el area de un circulo de radio la distancia del foton
-		// mas lejano (de los cercanos) respecto al punto de interseccion
-		Real area = 3.14 * std::pow(max_distance, 2);
-		//L += sumatorio / area;
-	}
-	/////////////////////////////////////////////////////////////////////////
-	// FOTONES CAUSTICOS
-	if(!m_caustics_map.is_empty()){
-		m_caustics_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
-		sumatorio = Vector3(0);
-		for (i = 0; i < nearest_photons.size(); i++) {
+		/////////////////////////////////////////////////////////////////////////
+		// FOTONES CAUSTICOS
+		if(!m_caustics_map.is_empty()){
+			m_caustics_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
+			sumatorio = Vector3(0);
+			for (i = 0; i < nearest_photons.size(); i++) {
 
-			// Obtiene la informacion de un foton
-			Photon photon = nearest_photons.at(i)->data();
-			Vector3 position = photon.position;
+				// Obtiene la informacion de un foton
+				Photon photon = nearest_photons.at(i)->data();
+				Vector3 position = photon.position;
 
-			/// ECUACION DE RENDER (suma de flujos de fotones) ///
-			sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
+				/// ECUACION DE RENDER (suma de flujos de fotones) ///
+				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
+			}
+			// Calcula el area de un circulo de radio la distancia del foton
+			// mas lejano (de los cercanos) respecto al punto de interseccion
+			area = 3.14 * std::pow(max_distance, 2);
+			L += sumatorio / area;
 		}
-		// Calcula el area de un circulo de radio la distancia del foton
-		// mas lejano (de los cercanos) respecto al punto de interseccion
-		area = 3.14 * std::pow(max_distance, 2);
-		//L += sumatorio / area;
-	}
-	////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////
 	
-	//cout << "Area: " << area << "\n";
-	//cout << "Nearest photons: " << nearest_photons.size() << "\n";
+		//cout << "Area: " << area << "\n";
+		//cout << "Nearest photons: " << nearest_photons.size() << "\n";
 
-	//cout << "Luz final(rojo): " << L.getComponent(0) << "\n";
-	//cout << "Luz final(verde): " << L.getComponent(1) << "\n";
-	//cout << "Luz final(azul): " << L.getComponent(2) << "\n";
+		//cout << "Luz final(rojo): " << L.getComponent(0) << "\n";
+		//cout << "Luz final(verde): " << L.getComponent(1) << "\n";
+		//cout << "Luz final(azul): " << L.getComponent(2) << "\n";
+	}
 
 	return L;
 }
