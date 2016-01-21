@@ -333,7 +333,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		// Calcula el area de un circulo de radio la distancia del foton
 		// mas lejano (de los cercanos) respecto al punto de interseccion
 		Real area = 3.14 * std::pow(max_distance, 2);
-		L += sumatorio / area;
+		//L += sumatorio / area;
 	}
 	/////////////////////////////////////////////////////////////////////////
 	// FOTONES CAUSTICOS
@@ -352,7 +352,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		// Calcula el area de un circulo de radio la distancia del foton
 		// mas lejano (de los cercanos) respecto al punto de interseccion
 		area = 3.14 * std::pow(max_distance, 2);
-		L += sumatorio / area;
+		//L += sumatorio / area;
 	}
 	////////////////////////////////////////////////////////////////////////
 	
@@ -364,56 +364,4 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	//cout << "Luz final(azul): " << L.getComponent(2) << "\n";
 
 	return L;
-	
-	//**********************************************************************
-	// The following piece of code is included here for two reasons: first
-	// it works as a 'hello world' code to check that everthing compiles 
-	// just fine, and second, to illustrate some of the functions that you 
-	// will need when doing the work. Goes without saying: remove the 
-	// pieces of code that you won't be using.
-	//
-	/*
-	unsigned int debug_mode = 0;
-
-	switch (debug_mode)
-	{
-	case 1:
-		// ----------------------------------------------------------------
-		// Display Albedo Only (color?)
-		L = it.intersected()->material()->get_albedo(it);
-		break;
-	case 2:
-		// ----------------------------------------------------------------
-		// Display Normal Buffer
-		L = it.get_normal();
-		break;
-	case 3:
-		// ----------------------------------------------------------------
-		// Display whether the material is specular (or refractive) 
-		L = Vector3(it.intersected()->material()->is_delta());
-		break;
-
-	case 4:
-		// ----------------------------------------------------------------
-		// Display incoming illumination from light(0)
-		L = world->light(0).get_incoming_light(it.get_position());
-		break;
-
-	case 5:
-		// ----------------------------------------------------------------
-		// Display incoming direction from light(0)
-		L = world->light(0).get_incoming_direction(it.get_position());
-		break;
-
-	case 6:
-		// ----------------------------------------------------------------
-		// Check Visibility from light(0)
-		if (world->light(0).is_visible(it.get_position()))
-			L = Vector3(1.);
-		break;
-	}
-	// End of exampled code
-	//**********************************************************************
-
-	return L;*/
 }
