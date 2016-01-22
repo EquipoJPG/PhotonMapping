@@ -49,12 +49,12 @@ int main(int argc, char* argv[])
 	name_file = default_name_file;
 
 	// TODO cambiar scene para cambiar la escena XD
-	unsigned int scene = 1;
+	unsigned int scene = 3;
 
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 
 				 max_shots = 100000, 
-				 nb_nearest_photons = 10;
+				 nb_nearest_photons = 30;
 
 	// ---------------------------------------------------------------------
 	// Parse input
@@ -165,7 +165,7 @@ int main(int argc, char* argv[])
 		w->add_object(sphere1);
 
 
-		Mesh* bunny = new Mesh("data\\bunny.obj", mirror);
+		Mesh* bunny = new Mesh("C:/Users/Jaime/git/PhotonMapping/SmallPM/data/bunny.obj", mirror);
 		w->add_object(bunny);
 	}
 	break;

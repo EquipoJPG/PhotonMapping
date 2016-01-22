@@ -35,7 +35,7 @@ class PhotonMapping
 {
 	World *world;
 	
-	unsigned int m_max_nb_shots, m_nb_global_photons, m_nb_caustic_photons;
+	unsigned int m_max_nb_shots, m_nb_global_photons, m_nb_caustic_photons, m_nb_volumetric_photons;
 	unsigned int m_nb_current_shots;
 
 	unsigned int m_nb_photons;
@@ -55,7 +55,7 @@ class PhotonMapping
 			position(p), direction(d), flux(f) {}
 	};
 
-	KDTree<Photon, 3> m_global_map, m_caustics_map;
+	KDTree<Photon, 3> m_global_map, m_caustics_map, m_volumetric_map;
 
 	// Compute the photons by tracing the Ray 'r' from the light source
 	// through the scene, and by storing the intersections with matter
@@ -70,7 +70,10 @@ class PhotonMapping
 	// The function will return true when there are more photons (caustic
 	// or diffuse) to be shot, and false otherwise.
 	bool trace_ray(const Ray& r, const Vector3 &p, 
-			   std::list<Photon> &global_photons, std::list<Photon> &caustic_photons, bool direct);
+			   std::list<Photon> &global_photons, 
+			   std::list<Photon> &caustic_photons, 
+			   std::list<Photon> &scatter_photons, 
+			   bool participative, bool direct);
 public:
 
  	PhotonMapping( World *_world, unsigned int nb_global_photons, unsigned int nb_caustic_photons,

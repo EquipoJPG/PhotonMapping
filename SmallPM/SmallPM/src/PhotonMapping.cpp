@@ -33,7 +33,10 @@ In no event shall copyright holders be liable for any damage.
 // or diffuse) to be shot, and false otherwise.
 //---------------------------------------------------------------------
 bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p, 
-			   std::list<Photon> &global_photons, std::list<Photon> &caustic_photons, bool direct)
+			   std::list<Photon> &global_photons, 
+			   std::list<Photon> &caustic_photons, 
+			   std::list<Photon> &scatter_photons, 
+			   bool participative, bool direct)
 {
 
 	//Check if max number of shots done...
@@ -60,6 +63,13 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		if( !it.did_hit() )
 			break;
 
+		///////// MEDIO PARTICIPATIVO CODE //////////
+		if(participative)
+		{
+
+		}
+		///////// FIN MEDIO PARTICIPATIVO //////////
+
 		//Check if has hit a delta material...
 		if( it.intersected()->material()->is_delta() )
 		{
@@ -85,6 +95,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			is_caustic_particle = false;
 		}	
 		
+		// INICIO RULETA RUSA /////////////
 		Real pdf;
 
 		Vector3 surf_albedo = it.intersected()->material()->get_albedo(it);
@@ -100,6 +111,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		// Random walk's next step
 		// Get sampled direction plus pdf, and update attenuation
 		it.intersected()->material()->get_outgoing_sample_ray(it, photon_ray, pdf );
+
+		// FIN RULETA RUSA ///////////////
 
 		// Shade...
 		energy = energy*surf_albedo;
@@ -143,6 +156,8 @@ void PhotonMapping::preprocess()
 {
 	int gp = 0;
 	int cp = 0;
+	int vp = 0;
+	bool participativeRoom = false;
 	// Muestrea las fuentes de luz de la escena
 	for(int i = 0; i < world->nb_lights(); i++){
 		
@@ -179,8 +194,9 @@ void PhotonMapping::preprocess()
 			// Lanza los fotones muestreados
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
+			std::list<Photon> scatterPhotons;
 
-			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, false);
+			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, scatterPhotons, participativeRoom, false);
 
 			// Almacena las colisiones de los fotones difusos
 			int k;
@@ -216,6 +232,23 @@ void PhotonMapping::preprocess()
 
 				causticPhotons.pop_front(); // elimina el foton almacenado de la lista
 			}
+
+			// Almacena las colisiones de los fotones volumetricos
+			for (k = 0; k < scatterPhotons.size(); k++) {
+				vp++;
+
+				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+				Photon photon = scatterPhotons.front();
+
+				std::vector<Real> photonPosition = std::vector<Real>();
+				photonPosition.push_back(photon.position.getComponent(0));
+				photonPosition.push_back(photon.position.getComponent(1));
+				photonPosition.push_back(photon.position.getComponent(2));
+				
+				m_volumetric_map.store(photonPosition, photon);
+
+				scatterPhotons.pop_front(); // elimina el foton almacenado de la lista
+			}
 		}
 	}
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
@@ -225,6 +258,10 @@ void PhotonMapping::preprocess()
 	//cout << m_global_map.nb_elements() << "\n";
 	if(cp > 0){
 		m_caustics_map.balance();
+	}
+
+	if(vp > 0){
+		m_volumetric_map.balance();
 	}
 }
 
@@ -245,7 +282,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// debug = 1 LUZ DIRECTA
 	// debug = 2 LUZ INDIRECTA
 	// debug = 3 LUZ DIRECTA + INDIRECTA
-	int debug = 2;
+	int debug = 3;
 
 	// ESTRUCTURA
 	// -----------------------------------------------------------
@@ -333,9 +370,14 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				// Obtiene la informacion de un foton
 				Photon photon = nearest_photons.at(i)->data();
 				Vector3 position = photon.position;
+				Vector3 inters = it.get_position();
+
+				// Calcular vector entre posicion y interseccion
+				Vector3 vectorcito = position - inters;
+				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
+				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it) * ((max_distance - distance) / max_distance);
 			}
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
