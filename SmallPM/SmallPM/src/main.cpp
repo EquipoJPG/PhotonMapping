@@ -49,10 +49,11 @@ int main(int argc, char* argv[])
 	name_file = default_name_file;
 
 	// TODO cambiar scene para cambiar la escena XD
-	unsigned int scene = 3;
+	unsigned int scene = 1;
 
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 
+				 photons_volumetric = 10000,
 				 max_shots = 100000, 
 				 nb_nearest_photons = 30;
 
@@ -186,7 +187,7 @@ int main(int argc, char* argv[])
 	// Create Film and rendering engine
 	//
 	film = new Film(sizex,sizey);
-	pm = new PhotonMapping(w, photons_global, photons_caustic, max_shots, nb_nearest_photons );
+	pm = new PhotonMapping(w, photons_global, photons_caustic, photons_volumetric, max_shots, nb_nearest_photons );
 	engine = new RenderEngine(w, film, &camera, pm);
 	
 	engine->render(name_file);	

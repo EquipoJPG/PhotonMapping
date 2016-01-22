@@ -18,6 +18,12 @@ In no event shall copyright holders be liable for any damage.
 #include "BSDF.h"
 #include <math.h>
 
+double fRand(double fMin, double fMax)
+{
+	double f = (double) rand() / RAND_MAX;
+	return fMin + f* (fMax - fMin);
+}
+
 //*********************************************************************
 // Compute the photons by tracing the Ray 'r' from the light source
 // through the scene, and by storing the intersections with matter
@@ -35,7 +41,7 @@ In no event shall copyright holders be liable for any damage.
 bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p, 
 			   std::list<Photon> &global_photons, 
 			   std::list<Photon> &caustic_photons, 
-			   std::list<Photon> &scatter_photons, 
+			   std::list<Photon> &volumetric_photons, 
 			   bool participative, bool direct)
 {
 
@@ -63,12 +69,100 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		if( !it.did_hit() )
 			break;
 
-		///////// MEDIO PARTICIPATIVO CODE //////////
+		////////////////// MEDIO PARTICIPATIVO CODE ///////////////////
 		if(participative)
 		{
+			// Coeficiente de extincion
+			double sigmaT = 0.4;
 
+			// Coeficiente de scattering
+			double sigmaS = fRand(0,sigmaT);
+
+			// Coeficiente de absorcion
+			double sigmaA = sigmaT - sigmaS;
+
+			// Booleano para saber si se absorbio
+			bool absorbido = false;
+
+			// Lambda
+			double lambda = 1.0/sigmaT;
+
+			// Inicio
+			Vector3 x(photon_ray.get_origin());
+
+			// Interseccion
+			Vector3 xs(it.get_position());
+
+			// Direccion del rayo
+			Vector3 dir(photon_ray.get_direction());
+
+			// Nuevo punto a comprobar
+			Vector3 xp(x + dir*lambda);
+
+			// Direccion de comprobar
+			Vector3 dirComp(xs - xp);
+
+			// Mientras no se haya pasado del punto de interseccion
+			while(dirComp.dot(dir)>=0 && !absorbido)
+			{
+				// Ruleta rusa para saber si el foton continua avanzando
+				double ruletitaRusa = fRand(0,1);
+
+				if(ruletitaRusa <= sigmaT)
+				{
+					// El foton se ve alterado, se ha producido un evento
+					if(ruletitaRusa >= sigmaS)
+					{
+						// Evento de scattering
+						// Se guarda
+						if( volumetric_photons.size() < m_nb_volumetric_photons )
+							volumetric_photons.push_back( Photon(xp, dirComp, energy));
+						// Calculamos nueva direccion aleatoria
+						double xd,yd,zd;
+						xd = fRand(-1,1);
+						yd = fRand(-1,1);
+						zd = fRand(-1,1);
+						Vector3 photonDir(xd,yd,zd);
+						Ray* tempRay = new Ray(xp, photonDir);
+
+						Intersection temp;
+						world->first_intersection(*tempRay, temp);
+
+						// Si el nuevo rayo se va al infinito lo almacenamos y ya
+						if( !temp.did_hit() )
+						{
+							absorbido = true;
+						}
+						else
+						{
+							// Actualizamos valores
+							dir = photonDir;
+							x = Vector3(xp);
+							xs = temp.get_position();
+							xp = Vector3(x + dir*lambda);
+							dirComp = Vector3(xs - xp);
+						}
+
+					}
+					else
+					{
+						// Evento de absorcion
+						absorbido = true;
+						// Si ha sido absorbido, se guarda
+						if( volumetric_photons.size() < m_nb_volumetric_photons )
+							volumetric_photons.push_back( Photon(xp, dirComp, energy));
+					}
+				}
+				else
+				{
+					// El foton sigue avanzando, recalculamos
+					x = Vector3(xp);
+					xp = Vector3(x + dir*lambda);
+					dirComp = Vector3(xs - xp);
+				}
+			}
 		}
-		///////// FIN MEDIO PARTICIPATIVO //////////
+		////////////////// FIN MEDIO PARTICIPATIVO ///////////////////
 
 		//Check if has hit a delta material...
 		if( it.intersected()->material()->is_delta() )
@@ -132,12 +226,6 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 	return true;
 }
 
-double fRand(double fMin, double fMax)
-{
-	double f = (double) rand() / RAND_MAX;
-	return fMin + f* (fMax - fMin);
-}
-
 //*********************************************************************
 // TODO: Implement the preprocess step of photon mapping,
 // where the photons are traced through the scene. To do it,
@@ -157,7 +245,7 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
-	bool participativeRoom = false;
+	bool participativeRoom = true;
 	// Muestrea las fuentes de luz de la escena
 	for(int i = 0; i < world->nb_lights(); i++){
 		
@@ -173,7 +261,7 @@ void PhotonMapping::preprocess()
 		// la variable 'm_max_nb_shots'
 		while (m_nb_current_shots < m_max_nb_shots)
 		{
-
+			
 			// REJECTION SAMPLING
 			double x,y,z;
 			do {
@@ -194,9 +282,9 @@ void PhotonMapping::preprocess()
 			// Lanza los fotones muestreados
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
-			std::list<Photon> scatterPhotons;
+			std::list<Photon> volumetricPhotons;
 
-			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, scatterPhotons, participativeRoom, false);
+			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, volumetricPhotons, participativeRoom, false);
 
 			// Almacena las colisiones de los fotones difusos
 			int k;
@@ -234,11 +322,11 @@ void PhotonMapping::preprocess()
 			}
 
 			// Almacena las colisiones de los fotones volumetricos
-			for (k = 0; k < scatterPhotons.size(); k++) {
+			for (k = 0; k < volumetricPhotons.size(); k++) {
 				vp++;
 
 				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
-				Photon photon = scatterPhotons.front();
+				Photon photon = volumetricPhotons.front();
 
 				std::vector<Real> photonPosition = std::vector<Real>();
 				photonPosition.push_back(photon.position.getComponent(0));
@@ -247,7 +335,7 @@ void PhotonMapping::preprocess()
 				
 				m_volumetric_map.store(photonPosition, photon);
 
-				scatterPhotons.pop_front(); // elimina el foton almacenado de la lista
+				volumetricPhotons.pop_front(); // elimina el foton almacenado de la lista
 			}
 		}
 	}
@@ -262,6 +350,7 @@ void PhotonMapping::preprocess()
 
 	if(vp > 0){
 		m_volumetric_map.balance();
+		cout << m_volumetric_map.nb_elements() << endl;
 	}
 }
 
@@ -282,7 +371,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// debug = 1 LUZ DIRECTA
 	// debug = 2 LUZ INDIRECTA
 	// debug = 3 LUZ DIRECTA + INDIRECTA
-	int debug = 3;
+	int debug = 4;
 
 	// ESTRUCTURA
 	// -----------------------------------------------------------
@@ -318,7 +407,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	pN = it.get_normal();
 	//////////////// FIN DE REBOTES //////////////////
 	
-	if(debug == 1 || debug == 3){
+	if(debug == 1 || debug == 3 || debug == 4){
 		// TERMINO AMBIENTAL
 		L += world->get_ambient() * it.intersected()->material()->get_albedo(it);
 	
@@ -344,7 +433,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 		}
 	}
-	if(debug == 2 || debug == 3){
+	if(debug == 2 || debug == 3 || debug == 4){
 		// LUZ INDIRECTA (Estimacion de radiancia) //
 		// pI = punto de interseccion (x,y,z)
 		// pN = normal en el punto de interseccion
@@ -404,7 +493,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			L += sumatorio / area;
 		}
 		////////////////////////////////////////////////////////////////////////
-	
+
 		//cout << "Area: " << area << "\n";
 		//cout << "Nearest photons: " << nearest_photons.size() << "\n";
 
@@ -412,6 +501,62 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		//cout << "Luz final(verde): " << L.getComponent(1) << "\n";
 		//cout << "Luz final(azul): " << L.getComponent(2) << "\n";
 	}
+	if(debug == 4)
+	{
+		/////////////////////////////////////////////////////////////////////////
+		// FOTONES VOLUMETRICOS
+		if(!m_volumetric_map.is_empty()){
+			// Ray Marching, si, for real, confirmed 2016
+			// Copiamos la interseccion por si acaso
+			Intersection itV(it0);
+			// Calculamos el marching ray
+			Ray marchingRay(itV.get_ray());
+			// Sacamos el punto de origen
+			Vector3 origen(marchingRay.get_origin());
+			// Sacamos el punto de destino
+			Vector3 destino(itV.get_position());
+			// Sacamos el vector de direccion
+			Vector3 dir(marchingRay.get_direction());
+			// Sacamos el nuevo punto
+			double sigmaT = 0.1;
+			double landa = 1.0/sigmaT;
+			Vector3 nuevo(origen + dir*landa);
+			// Sacamos el vector entre destino y nuevo
+			Vector3 dirComp(destino - nuevo);
+			// Establecemos el radio para beam estimate
+			float radius = 3.0;
+			// Creamos nearest photons
+			std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
+			// Funcion de fase
+			double phaseFunction = 1.0 / (4.0*3.14159);
+
+			while(dirComp.dot(dir) >= 0)
+			{
+				Vector3 sumatorio = Vector3(0);
+				std::vector<Real> nuevoVR = std::vector<Real>();
+				nuevoVR.push_back(pI.getComponent(0));
+				nuevoVR.push_back(pI.getComponent(1));
+				nuevoVR.push_back(pI.getComponent(2));
+				m_volumetric_map.find(nuevoVR, m_nb_photons, nearest_photons, radius);
+				int i;
+				for (i = 0; i < nearest_photons.size(); i++) {
+
+					// Obtiene la informacion de un foton
+					Photon photon = nearest_photons.at(i)->data();
+					Vector3 position = photon.position;
+
+					/// ECUACION DE RENDER (suma de flujos de fotones) ///
+					sumatorio += photon.flux * phaseFunction;
+				}
+				// Calcula el area de un circulo de radio la distancia del foton
+				// mas lejano (de los cercanos) respecto al punto de interseccion
+				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radius,3);
+				L += sumatorio / volumen;
+			}
+		}
+		////////////////////////////////////////////////////////////////////////
+	}
+
 
 	return L;
 }

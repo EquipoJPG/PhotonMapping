@@ -76,10 +76,10 @@ class PhotonMapping
 			   bool participative, bool direct);
 public:
 
- 	PhotonMapping( World *_world, unsigned int nb_global_photons, unsigned int nb_caustic_photons,
+ 	PhotonMapping( World *_world, unsigned int nb_global_photons, unsigned int nb_caustic_photons, unsigned int nb_volumetric_photons,
 				   unsigned int max_nb_shots, unsigned int nb_photons, bool raytraced_direct = true): 
  		world(_world), m_max_nb_shots(max_nb_shots), m_nb_current_shots(0),
-		m_nb_global_photons(nb_global_photons), m_nb_caustic_photons(nb_caustic_photons),
+		m_nb_global_photons(nb_global_photons), m_nb_caustic_photons(nb_caustic_photons), m_nb_volumetric_photons(nb_volumetric_photons),
 		m_nb_photons(nb_photons), m_raytraced_direct(raytraced_direct)
 	{ }
 	
