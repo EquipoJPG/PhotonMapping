@@ -74,7 +74,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		{
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.5;				// Coeficiente de extincion
+			double sigmaT = 0.1;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 
@@ -91,7 +91,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			Vector3 dirComp(xs - xp);			// Direccion de comprobar
 
 			int pasitos = 0;
-			int max_pasitos = 1;
+			int max_pasitos = 5;
 
 			// Mientras no se haya pasado del punto de interseccion
 			while(dirComp.dot(w) >= 0 && !absorbido 
@@ -532,7 +532,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double e = 2.7189;
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.5;				// Coeficiente de extincion
+			double sigmaT = 0.1;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 			double landa = 0.2;			// 1 / sigmaT (mean-free path?)
@@ -608,7 +608,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			L += Ts * L + (sumInScattering);
+			L = Ts * L + (sumInScattering);
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
