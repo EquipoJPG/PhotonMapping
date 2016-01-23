@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 				 photons_caustic = 10000, 
 				 photons_volumetric = 10000,
 				 max_shots = 50000, 
-				 nb_nearest_photons = 5;
+				 nb_nearest_photons = 20;
 
 	// ---------------------------------------------------------------------
 	// Parse input

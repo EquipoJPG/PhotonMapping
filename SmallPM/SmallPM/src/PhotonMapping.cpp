@@ -74,7 +74,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		{
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.1;				// Coeficiente de extincion
+			double sigmaT = 0.2;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 
@@ -356,7 +356,6 @@ void PhotonMapping::preprocess()
 
 	if(vp > 0){
 		m_volumetric_map.balance();
-		cout << "VOLUMETRIC BALANCED" << endl;
 	}
 }
 
@@ -524,7 +523,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double e = 2.7189;
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.1;				// Coeficiente de extincion
+			double sigmaT = 0.2;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 			double landa = 0.5;			// 1 / sigmaT (mean-free path?)
@@ -533,7 +532,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 			// Marching ray
 			Ray marchingRay(itV.get_ray());
-			Vector3 x(marchingRay.get_origin());
+			Vector3 xOriginal(marchingRay.get_origin());
+			Vector3 x = Vector3(xOriginal);
 			Vector3 w(marchingRay.get_direction());
 			
 			// Punto destino (xs)
@@ -548,7 +548,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 			// Calculos ECUACION VOLUMETRICA DE RENDER //
 			// e^ -(||xs - x|| * sigmaT)
-			Real Ts = pow(e, (-1) * (Vector3(xs - x).length() * sigmaT));
+			Real Ts = pow(e, (-1) * (Vector3(xs - xOriginal).length() * sigmaT));
+			//cout << "TS: " << Ts << endl;
 			
 			// Lobjeto (calculada con los fotones difusos y causticos mas arriba en el codigo)
 			// Vector3 Lobjeto = Ldifusa + Lcaustica;
@@ -556,6 +557,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Calcula ray marching
 			Vector3 sumLi = Vector3(0);
 			Vector3 sumTt = Vector3(0);
+			Vector3 sumInScattering = Vector3(0);
 			while(dirComp.dot(w) >= 0)
 			{
 
@@ -567,7 +569,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				// Transmitancia hasta punto xt
 				// e^ -(||xt - x|| * sigmaT)
-				Real Tt = pow(e, (-1) * (Vector3(xt - x).length() * sigmaT));
+				Real Tt = pow(e, (-1) * (Vector3(xt - xOriginal).length() * sigmaT));
+				//cout << "Tt: " << Tt << endl;
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
@@ -583,8 +586,11 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 					Li += phaseFunction * photon.flux / volumen;
 				}
 
-				sumLi += Li;
-				sumTt += (1 - Tt) / sigmaT;
+				// Calcula la radiancia ganada por in-scattering
+				sumInScattering += Tt * sigmaS * Li;
+				
+				//sumLi += (1 - Tt) / sigma;
+				//sumTt += (1 - Tt) / sigmaT;
 
 				// Obtiene el nuevo punto (xt)
 				x = Vector3(xt);
@@ -593,7 +599,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			L += Ts * (Ldifusa + Lcaustica) + (sigmaS * sumLi * sumTt);
+			L += Ts * (Ldifusa + Lcaustica) + (sumInScattering);
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
