@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
 	name_file = default_name_file;
 
 	// TODO cambiar scene para cambiar la escena XD
-	unsigned int scene = 1;
+	unsigned int scene = 0;
 
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 

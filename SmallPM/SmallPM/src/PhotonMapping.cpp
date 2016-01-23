@@ -70,6 +70,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		Intersection it;
 		world->first_intersection(photon_ray, it);
 
+		bool hasHit = it.did_hit();
+
 		////////////////// MEDIO PARTICIPATIVO CODE ///////////////////
 		if(participative)
 		{
@@ -92,11 +94,11 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			Vector3 dirComp(xs - xp);			// Direccion de comprobar
 
 			int pasitos = 0;
-			int max_pasitos = 10;
+			int max_pasitos = 30;
 
 			// Mientras no se haya pasado del punto de interseccion
 			while(dirComp.dot(w) >= 0 && !absorbido 
-				&& pasitos < max_pasitos)
+				&& (pasitos < max_pasitos || hasHit))
 			{
 				// Ruleta rusa para saber si el foton continua avanzando
 				double ruletitaRusa = fRand(0,1);
@@ -258,10 +260,10 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
-	double sigmaT = 0.1;
+	double sigmaT = 0.3;
 	double sigmaS = fRand(0,sigmaT);
 	double sigmaA = sigmaT - sigmaS;
-	double lambda = 0.5;
+	double lambda = 0.04;
 	globalST = sigmaT;
 	globalSS = sigmaS;
 	globalSA = sigmaA;
@@ -553,7 +555,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double sigmaT = globalST;				// Coeficiente de extincion
 			double sigmaS = globalSS;	// Coeficiente de scattering
 			double sigmaA = globalSA;	// Coeficiente de absorcion
-			double landa = globalLambda;			// 1 / sigmaT (mean-free path?)
+			double landa = 0.2;			// 1 / sigmaT (mean-free path?)
 
 			Intersection itV(it0);		// Copiamos la interseccion por si acaso
 
@@ -602,7 +604,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
 				std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
-				m_volumetric_map.find(xp, m_nb_photons, nearest_photons, radio);
+				m_volumetric_map.find(xp, m_nb_photons + 5, nearest_photons, radio);
 				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radio,3);
 
 				// Calcula Li (luz proveniente del evento in-scattering)
