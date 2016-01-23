@@ -42,7 +42,6 @@ namespace {
 int main(int argc, char* argv[])
 {
 
-
 	Real focal_distance = 2.6;
 
 	char *name_file = NULL, *default_name_file = "name_file";
@@ -51,11 +50,11 @@ int main(int argc, char* argv[])
 	// TODO cambiar scene para cambiar la escena XD
 	unsigned int scene = 1;
 
-	unsigned int photons_global = 10000, 
-				 photons_caustic = 10000, 
-				 photons_volumetric = 10000,
-				 max_shots = 100000, 
-				 nb_nearest_photons = 30;
+	unsigned int photons_global = 20000, 
+				 photons_caustic = 20000, 
+				 photons_volumetric = 20000,
+				 max_shots = 200000, 
+				 nb_nearest_photons = 10;
 
 	// ---------------------------------------------------------------------
 	// Parse input

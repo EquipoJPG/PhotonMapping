@@ -72,52 +72,43 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		////////////////// MEDIO PARTICIPATIVO CODE ///////////////////
 		if(participative)
 		{
-			// Coeficiente de extincion
-			double sigmaT = 0.4;
 
-			// Coeficiente de scattering
-			double sigmaS = fRand(0,sigmaT);
+			// Coeficientes (caracteristicas medio participativo)
+			double sigmaT = 0.05;				// Coeficiente de extincion
+			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
+			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 
-			// Coeficiente de absorcion
-			double sigmaA = sigmaT - sigmaS;
-
-			// Booleano para saber si se absorbio
 			bool absorbido = false;
+			double lambda = 0.1;			// Lambda (mean-free path = 1 / sigmaT)
 
-			// Lambda
-			double lambda = 1.0/sigmaT;
+			// Siguiente paso
+			Vector3 x(photon_ray.get_origin());			// Inicio
+			Vector3 xs(it.get_position());				// Interseccion
+			Vector3 w(photon_ray.get_direction());		// Direccion del rayo
 
-			// Inicio
-			Vector3 x(photon_ray.get_origin());
-
-			// Interseccion
-			Vector3 xs(it.get_position());
-
-			// Direccion del rayo
-			Vector3 dir(photon_ray.get_direction());
-
-			// Nuevo punto a comprobar
-			Vector3 xp(x + dir*lambda);
-
-			// Direccion de comprobar
-			Vector3 dirComp(xs - xp);
+			// Comprobacion de estar en el medio participativo
+			Vector3 xp(x + w*lambda);			// Nuevo punto a comprobar
+			Vector3 dirComp(xs - xp);			// Direccion de comprobar
 
 			// Mientras no se haya pasado del punto de interseccion
-			while(dirComp.dot(dir)>=0 && !absorbido)
+			while(dirComp.dot(w) >= 0 && !absorbido)
 			{
 				// Ruleta rusa para saber si el foton continua avanzando
 				double ruletitaRusa = fRand(0,1);
 
 				if(ruletitaRusa <= sigmaT)
 				{
+
 					// El foton se ve alterado, se ha producido un evento
 					if(ruletitaRusa >= sigmaS)
 					{
 						// Evento de scattering
-						// Se guarda
+
+						// Se guarda el foton si queda espacio en el mapa de volumen
 						if( volumetric_photons.size() < m_nb_volumetric_photons )
 							volumetric_photons.push_back( Photon(xp, dirComp, energy));
-						// Calculamos nueva direccion aleatoria
+
+						// Calcula nueva direccion aleatoria
 						double xd,yd,zd;
 						xd = fRand(-1,1);
 						yd = fRand(-1,1);
@@ -128,18 +119,22 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 						Intersection temp;
 						world->first_intersection(*tempRay, temp);
 
-						// Si el nuevo rayo se va al infinito lo almacenamos y ya
 						if( !temp.did_hit() )
 						{
+							// El nuevo rayo va al infinito
+							// El medio participativo ocupa toda la escena,
+							// por lo tanto si no hay ningun objeto delante
+							// se considera que el evento es absorcion
+
 							absorbido = true;
 						}
 						else
 						{
-							// Actualizamos valores
-							dir = photonDir;
+							// Actualiza los valores para el nuevo paso
+							w = photonDir;
 							x = Vector3(xp);
 							xs = temp.get_position();
-							xp = Vector3(x + dir*lambda);
+							xp = Vector3(x + w*lambda);
 							dirComp = Vector3(xs - xp);
 						}
 
@@ -148,7 +143,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 					{
 						// Evento de absorcion
 						absorbido = true;
-						// Si ha sido absorbido, se guarda
+
+						// El foton se guarda si el mapa de volumen no esta lleno
 						if( volumetric_photons.size() < m_nb_volumetric_photons )
 							volumetric_photons.push_back( Photon(xp, dirComp, energy));
 					}
@@ -157,7 +153,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 				{
 					// El foton sigue avanzando, recalculamos
 					x = Vector3(xp);
-					xp = Vector3(x + dir*lambda);
+					xp = Vector3(x + w*lambda);
 					dirComp = Vector3(xs - xp);
 				}
 			}
@@ -339,6 +335,12 @@ void PhotonMapping::preprocess()
 			}
 		}
 	}
+
+	cout << m_nb_current_shots << "/" << m_max_nb_shots << endl;
+	cout << "GP: " << gp << endl;
+	cout << "CP: " << cp << endl;
+	cout << "VP: " << vp << endl;
+
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
 	if(gp > 0){
 		m_global_map.balance();
@@ -350,7 +352,7 @@ void PhotonMapping::preprocess()
 
 	if(vp > 0){
 		m_volumetric_map.balance();
-		cout << m_volumetric_map.nb_elements() << endl;
+		cout << "VOLUMETRIC BALANCED" << endl;
 	}
 }
 
@@ -407,6 +409,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	pN = it.get_normal();
 	//////////////// FIN DE REBOTES //////////////////
 	
+	Vector3 Lobjeto;
+
 	if(debug == 1 || debug == 3 || debug == 4){
 		// TERMINO AMBIENTAL
 		L += world->get_ambient() * it.intersected()->material()->get_albedo(it);
@@ -472,6 +476,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// mas lejano (de los cercanos) respecto al punto de interseccion
 			Real area = 3.14 * std::pow(max_distance, 2);
 			L += sumatorio / area;
+
+			Lobjeto = sumatorio / area; // para la ecuacion volumetrica -> L(xs -> w)
 		}
 		/////////////////////////////////////////////////////////////////////////
 		// FOTONES CAUSTICOS
@@ -506,53 +512,75 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		/////////////////////////////////////////////////////////////////////////
 		// FOTONES VOLUMETRICOS
 		if(!m_volumetric_map.is_empty()){
-			// Ray Marching, si, for real, confirmed 2016
-			// Copiamos la interseccion por si acaso
-			Intersection itV(it0);
-			// Calculamos el marching ray
+
+			// Coeficientes (caracteristicas medio participativo)
+			double sigmaT = 0.05;				// Coeficiente de extincion
+			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
+			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
+			double landa = 0.2;			// 1 / sigmaT (mean-free path?)
+
+			Intersection itV(it0);		// Copiamos la interseccion por si acaso
+
+			// Marching ray
 			Ray marchingRay(itV.get_ray());
-			// Sacamos el punto de origen
-			Vector3 origen(marchingRay.get_origin());
-			// Sacamos el punto de destino
-			Vector3 destino(itV.get_position());
-			// Sacamos el vector de direccion
-			Vector3 dir(marchingRay.get_direction());
-			// Sacamos el nuevo punto
-			double sigmaT = 0.1;
-			double landa = 1.0/sigmaT;
-			Vector3 nuevo(origen + dir*landa);
-			// Sacamos el vector entre destino y nuevo
-			Vector3 dirComp(destino - nuevo);
-			// Establecemos el radio para beam estimate
-			float radius = 3.0;
-			// Creamos nearest photons
+			Vector3 x(marchingRay.get_origin());
+			Vector3 w(marchingRay.get_direction());
+			
+			// Punto destino (xs)
+			Vector3 xs(itV.get_position());
+			
+			// Obtiene el nuevo punto (xt)
+			Vector3 xt(x + w*landa);
+			Vector3 dirComp(xs - xt);
+
+			// Establecemos el radio para beam estimate (ahora no se usa)
+			float radio;
 			std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
-			// Funcion de fase
+			
+			// Funcion de fase isotropica (medio participativo homogeneo => 1/(4*PI) )
 			double phaseFunction = 1.0 / (4.0*3.14159);
 
-			while(dirComp.dot(dir) >= 0)
+			// Calculos ECUACION VOLUMETRICA DE RENDER //
+			Real Ts = Vector3(xs - x).length() * sigmaT; // ||xs - x|| * sigmaT
+
+			// Lobjeto (calculada con los fotones difusos mas arriba en el codigo)
+			// Vector3 Lobjeto;
+
+			// Calcula ray marching
+			Vector3 sumatorio = Vector3(0);
+			while(dirComp.dot(w) >= 0)
 			{
-				Vector3 sumatorio = Vector3(0);
-				std::vector<Real> nuevoVR = std::vector<Real>();
-				nuevoVR.push_back(pI.getComponent(0));
-				nuevoVR.push_back(pI.getComponent(1));
-				nuevoVR.push_back(pI.getComponent(2));
-				m_volumetric_map.find(nuevoVR, m_nb_photons, nearest_photons, radius);
-				int i;
-				for (i = 0; i < nearest_photons.size(); i++) {
+				
+				// NUEVO PASO EN RAY MARCHING
+				std::vector<Real> xp = std::vector<Real>();
+				xp.push_back(xt.getComponent(0));
+				xp.push_back(xt.getComponent(1));
+				xp.push_back(xt.getComponent(2));
 
-					// Obtiene la informacion de un foton
+				// Transmitancia hasta punto xt
+				Real Tt = Vector3(xt - x).length() * sigmaS; // ||xt - x|| * sigmaS
+
+				// Obtiene los k fotones cercanos al paso t (xp = xt)
+				m_volumetric_map.find(xp, m_nb_photons, nearest_photons, radio);
+				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radio,3);
+
+				// Calcula Li (luz proveniente del evento in-scattering)
+				Vector3 Li = Vector3(0);
+
+				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
-					Vector3 position = photon.position;
-
-					/// ECUACION DE RENDER (suma de flujos de fotones) ///
-					sumatorio += photon.flux * phaseFunction;
+					Li += phaseFunction * photon.flux / volumen;
 				}
-				// Calcula el area de un circulo de radio la distancia del foton
-				// mas lejano (de los cercanos) respecto al punto de interseccion
-				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radius,3);
-				L += sumatorio / volumen;
+
+				sumatorio += Tt * sigmaS * Li;
+
+				// Obtiene el nuevo punto (xt)
+				Vector3 xt(x + w*landa);
+				Vector3 dirComp(xs - xt);
 			}
+
+			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
+			L += Ts * Lobjeto + sumatorio;
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
