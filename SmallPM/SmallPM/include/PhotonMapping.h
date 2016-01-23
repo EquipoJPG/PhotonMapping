@@ -38,6 +38,12 @@ class PhotonMapping
 	unsigned int m_max_nb_shots, m_nb_global_photons, m_nb_caustic_photons, m_nb_volumetric_photons;
 	unsigned int m_nb_current_shots;
 
+	double globalST;
+	double globalSS;
+	double globalSA;
+	double globalLambda;
+
+
 	unsigned int m_nb_photons;
 	bool m_raytraced_direct;
 
@@ -73,7 +79,11 @@ class PhotonMapping
 			   std::list<Photon> &global_photons, 
 			   std::list<Photon> &caustic_photons, 
 			   std::list<Photon> &scatter_photons, 
-			   bool participative, bool direct);
+			   bool participative, bool direct,
+			   double sT,
+			   double sS,
+			   double sA,
+			   double landa);
 public:
 
  	PhotonMapping( World *_world, unsigned int nb_global_photons, unsigned int nb_caustic_photons, unsigned int nb_volumetric_photons,

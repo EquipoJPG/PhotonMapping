@@ -42,7 +42,11 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			   std::list<Photon> &global_photons, 
 			   std::list<Photon> &caustic_photons, 
 			   std::list<Photon> &volumetric_photons, 
-			   bool participative, bool direct)
+			   bool participative, bool direct,
+			   double sT,
+			   double sS,
+			   double sA,
+			   double landa)
 {
 
 	//Check if max number of shots done...
@@ -66,20 +70,17 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		Intersection it;
 		world->first_intersection(photon_ray, it);
 
-		if( !it.did_hit() )
-			break;
-
 		////////////////// MEDIO PARTICIPATIVO CODE ///////////////////
 		if(participative)
 		{
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.1;				// Coeficiente de extincion
-			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
-			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
+			double sigmaT = sT;	// Coeficiente de extincion
+			double sigmaS = sS;	// Coeficiente de scattering
+			double sigmaA = sA;	// Coeficiente de absorcion
 
 			bool absorbido = false;
-			double lambda = 0.2;			// Lambda (mean-free path = 1 / sigmaT)
+			double lambda = landa;			// Lambda (mean-free path = 1 / sigmaT)
 
 			// Siguiente paso
 			Vector3 x(photon_ray.get_origin());			// Inicio
@@ -91,7 +92,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			Vector3 dirComp(xs - xp);			// Direccion de comprobar
 
 			int pasitos = 0;
-			int max_pasitos = 5;
+			int max_pasitos = 10;
 
 			// Mientras no se haya pasado del punto de interseccion
 			while(dirComp.dot(w) >= 0 && !absorbido 
@@ -172,6 +173,9 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			}
 		}
 		////////////////// FIN MEDIO PARTICIPATIVO ///////////////////
+
+		if( !it.did_hit() )
+			break;
 
 		//Check if has hit a delta material...
 		if( it.intersected()->material()->is_delta() )
@@ -254,6 +258,14 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
+	double sigmaT = 0.1;
+	double sigmaS = fRand(0,sigmaT);
+	double sigmaA = sigmaT - sigmaS;
+	double lambda = 0.5;
+	globalST = sigmaT;
+	globalSS = sigmaS;
+	globalSA = sigmaA;
+	globalLambda = lambda;
 	bool participativeRoom = true;
 	// Muestrea las fuentes de luz de la escena
 	for(int i = 0; i < world->nb_lights(); i++){
@@ -293,7 +305,8 @@ void PhotonMapping::preprocess()
 			std::list<Photon> causticPhotons;
 			std::list<Photon> volumetricPhotons;
 
-			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, volumetricPhotons, participativeRoom, false);
+			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, volumetricPhotons, participativeRoom, false, sigmaT,
+				sigmaS, sigmaA, lambda);
 
 			// Almacena las colisiones de los fotones difusos
 			int k;
@@ -502,9 +515,14 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				// Obtiene la informacion de un foton
 				Photon photon = nearest_photons.at(i)->data();
 				Vector3 position = photon.position;
+				Vector3 inters = it.get_position();
+
+				// Calcular vector entre posicion y interseccion
+				Vector3 vectorcito = position - inters;
+				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it);
+				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it) * ((max_distance - distance) / max_distance);
 			}
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
@@ -532,10 +550,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double e = 2.7189;
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.1;				// Coeficiente de extincion
-			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
-			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
-			double landa = 0.2;			// 1 / sigmaT (mean-free path?)
+			double sigmaT = globalST;				// Coeficiente de extincion
+			double sigmaS = globalSS;	// Coeficiente de scattering
+			double sigmaA = globalSA;	// Coeficiente de absorcion
+			double landa = globalLambda;			// 1 / sigmaT (mean-free path?)
 
 			Intersection itV(it0);		// Copiamos la interseccion por si acaso
 
