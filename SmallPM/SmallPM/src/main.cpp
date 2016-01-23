@@ -27,6 +27,7 @@ In no event shall copyright holders be liable for any damage.
 #include "Lambertian.h"
 #include "Specular.h"
 #include "Transmissive.h"
+#include <time.h>
 
 using namespace std;
 
@@ -34,7 +35,7 @@ namespace {
 	Film *film;
 	RenderEngine *engine;
 	PhotonMapping *pm;
-	int sizex = 512, sizey = 512;
+	int sizex = 128, sizey = 128;
 }
 
 
@@ -42,6 +43,7 @@ namespace {
 int main(int argc, char* argv[])
 {
 
+	//srand(time(0));
 	Real focal_distance = 2.6;
 
 	char *name_file = NULL, *default_name_file = "name_file";
@@ -54,7 +56,7 @@ int main(int argc, char* argv[])
 				 photons_caustic = 10000, 
 				 photons_volumetric = 10000,
 				 max_shots = 50000, 
-				 nb_nearest_photons = 20;
+				 nb_nearest_photons = 5;
 
 	// ---------------------------------------------------------------------
 	// Parse input
@@ -100,6 +102,7 @@ int main(int argc, char* argv[])
 	BSDF* red = new Lambertian(w, Vector3(.85,.085,.085));
 	BSDF* green = new Lambertian(w, Vector3(.085,.85,.085));
 
+	// Suelo
 	Triangle* floor1 = new Triangle( Vector3(-1.5,0,1.5),Vector3(1.5,0.,1.5),
 									 Vector3(-1.5,0.,-1.5), white);
 	w->add_object(floor1); 
@@ -107,6 +110,7 @@ int main(int argc, char* argv[])
 		Vector3(1.5,0.,-1.5), white);
 	w->add_object(floor2); 
 
+	// Techo
 	Triangle* ceil1 = new Triangle(Vector3(1.5,2.,1.5), Vector3(-1.5,2,1.5), 
 		Vector3(-1.5,2.,-1.5), white);
 	w->add_object(ceil1); 
@@ -114,6 +118,7 @@ int main(int argc, char* argv[])
 		Vector3(1.5,2.,-1.5), white);
 	w->add_object(ceil2); 
 
+	// Pared fondo
 	Triangle* back1 = new Triangle(Vector3(1.5,2.5,-1), Vector3(-1.5,2.5,-1), 
 		Vector3(-1.5,-.5,-1), white);
 	w->add_object(back1); 
@@ -121,6 +126,7 @@ int main(int argc, char* argv[])
 		Vector3(1.5,-.5,-1), white);
 	w->add_object(back2); 
 
+	// Pared izquierda
 	Triangle* left1 = new Triangle(Vector3(-1,2.5,-1.5),Vector3(-1,2.5,1.5), 
 		Vector3(-1,-0.5,-1.5), red);
 	w->add_object(left1); 
@@ -128,13 +134,13 @@ int main(int argc, char* argv[])
 		Vector3(-1,-.5,1.5), red);
 	w->add_object(left2); 
 
+	// Pared derecha
 	Object3D* right1 = new Triangle(Vector3(1,2.5,1.5), Vector3(1,2.5,-1.5), 
 		Vector3(1,-.5,-1.5), green);
 	w->add_object(right1); 
 	Object3D* right2 = new Triangle(Vector3(1,2.5,1.5), Vector3(1,-.5,-1.5), 
 		Vector3(1,-.5,1.5), green);
-	w->add_object(right2); 
-
+	w->add_object(right2);
 	
 	switch(scene)
 	{

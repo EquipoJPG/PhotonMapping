@@ -74,12 +74,12 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		{
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.2;				// Coeficiente de extincion
+			double sigmaT = 0.5;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 
 			bool absorbido = false;
-			double lambda = 0.5;			// Lambda (mean-free path = 1 / sigmaT)
+			double lambda = 0.2;			// Lambda (mean-free path = 1 / sigmaT)
 
 			// Siguiente paso
 			Vector3 x(photon_ray.get_origin());			// Inicio
@@ -90,11 +90,16 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			Vector3 xp(x + w*lambda);			// Nuevo punto a comprobar
 			Vector3 dirComp(xs - xp);			// Direccion de comprobar
 
+			int pasitos = 0;
+			int max_pasitos = 1;
+
 			// Mientras no se haya pasado del punto de interseccion
-			while(dirComp.dot(w) >= 0 && !absorbido)
+			while(dirComp.dot(w) >= 0 && !absorbido 
+				&& pasitos < max_pasitos)
 			{
 				// Ruleta rusa para saber si el foton continua avanzando
 				double ruletitaRusa = fRand(0,1);
+				
 
 				if(ruletitaRusa <= sigmaT)
 				{
@@ -108,6 +113,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 						if( volumetric_photons.size() < m_nb_volumetric_photons )
 							volumetric_photons.push_back( Photon(xp, dirComp, energy));
 
+						Intersection temp;
+						
 						// Calcula nueva direccion aleatoria
 						double xd,yd,zd;
 						xd = fRand(-1,1);
@@ -116,16 +123,18 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 						Vector3 photonDir(xd,yd,zd);
 						Ray* tempRay = new Ray(xp, photonDir);
 
-						Intersection temp;
+							
 						world->first_intersection(*tempRay, temp);
-
+						
 						if( !temp.did_hit() )
 						{
 							// El nuevo rayo va al infinito
 							// El medio participativo ocupa toda la escena,
 							// por lo tanto si no hay ningun objeto delante
-							// se considera que el evento es absorcion
-
+							// se vuelve a cambiar de direccion
+							pasitos++;
+						}
+						if (pasitos >= max_pasitos) {
 							absorbido = true;
 						}
 						else
@@ -479,9 +488,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
 			Real area = 3.14 * std::pow(max_distance, 2);
-			//L += sumatorio / area;
+			L += sumatorio / area;
 
-			Ldifusa = sumatorio / area; // para la ecuacion volumetrica -> L(xs -> w)
+			//Ldifusa = sumatorio / area; // para la ecuacion volumetrica -> L(xs -> w)
 		}
 		/////////////////////////////////////////////////////////////////////////
 		// FOTONES CAUSTICOS
@@ -500,9 +509,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
 			area = 3.14 * std::pow(max_distance, 2);
-			//L += sumatorio / area;
+			L += sumatorio / area;
 
-			Lcaustica = sumatorio / area;
+			//Lcaustica = sumatorio / area;
 
 		}
 		////////////////////////////////////////////////////////////////////////
@@ -523,10 +532,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double e = 2.7189;
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.2;				// Coeficiente de extincion
+			double sigmaT = 0.5;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
-			double landa = 0.5;			// 1 / sigmaT (mean-free path?)
+			double landa = 0.2;			// 1 / sigmaT (mean-free path?)
 
 			Intersection itV(it0);		// Copiamos la interseccion por si acaso
 
@@ -599,7 +608,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			L += Ts * (Ldifusa + Lcaustica) + (sumInScattering);
+			L += Ts * L + (sumInScattering);
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
