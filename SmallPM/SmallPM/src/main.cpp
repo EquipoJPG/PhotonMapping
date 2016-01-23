@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 
 				 photons_volumetric = 10000,
-				 max_shots = 100000, 
+				 max_shots = 50000, 
 				 nb_nearest_photons = 10;
 
 	// ---------------------------------------------------------------------
