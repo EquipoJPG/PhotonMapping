@@ -74,12 +74,12 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		{
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.05;				// Coeficiente de extincion
+			double sigmaT = 0.01;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 
 			bool absorbido = false;
-			double lambda = 0.1;			// Lambda (mean-free path = 1 / sigmaT)
+			double lambda = 0.5;			// Lambda (mean-free path = 1 / sigmaT)
 
 			// Siguiente paso
 			Vector3 x(photon_ray.get_origin());			// Inicio
@@ -514,10 +514,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		if(!m_volumetric_map.is_empty()){
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.05;				// Coeficiente de extincion
+			double sigmaT = 0.01;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
-			double landa = 0.2;			// 1 / sigmaT (mean-free path?)
+			double landa = 0.5;			// 1 / sigmaT (mean-free path?)
 
 			Intersection itV(it0);		// Copiamos la interseccion por si acaso
 
@@ -530,12 +530,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			Vector3 xs(itV.get_position());
 			
 			// Obtiene el nuevo punto (xt)
-			Vector3 xt(x + w*landa);
-			Vector3 dirComp(xs - xt);
-
-			// Establecemos el radio para beam estimate (ahora no se usa)
-			float radio;
-			std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
+			Vector3 xt = Vector3(x + w*landa);
+			Vector3 dirComp = Vector3(xs - xt);
 			
 			// Funcion de fase isotropica (medio participativo homogeneo => 1/(4*PI) )
 			double phaseFunction = 1.0 / (4.0*3.14159);
@@ -550,7 +546,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			Vector3 sumatorio = Vector3(0);
 			while(dirComp.dot(w) >= 0)
 			{
-				
+
 				// NUEVO PASO EN RAY MARCHING
 				std::vector<Real> xp = std::vector<Real>();
 				xp.push_back(xt.getComponent(0));
@@ -561,6 +557,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real Tt = Vector3(xt - x).length() * sigmaS; // ||xt - x|| * sigmaS
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
+				float radio = 0;
+				std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
 				m_volumetric_map.find(xp, m_nb_photons, nearest_photons, radio);
 				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radio,3);
 
@@ -575,8 +573,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				sumatorio += Tt * sigmaS * Li;
 
 				// Obtiene el nuevo punto (xt)
-				Vector3 xt(x + w*landa);
-				Vector3 dirComp(xs - xt);
+				x = Vector3(xt);
+				xt = Vector3(x + w*landa);
+				dirComp = Vector3(xs - xt);
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
@@ -584,7 +583,6 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
-
 
 	return L;
 }
