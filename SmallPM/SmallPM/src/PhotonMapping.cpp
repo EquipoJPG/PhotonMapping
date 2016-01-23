@@ -74,7 +74,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		{
 
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.01;				// Coeficiente de extincion
+			double sigmaT = 0.1;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 
@@ -151,6 +151,10 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 				}
 				else
 				{
+					// Se guarda el foton si queda espacio en el mapa de volumen
+					if( volumetric_photons.size() < m_nb_volumetric_photons )
+						volumetric_photons.push_back( Photon(xp, dirComp, energy));
+
 					// El foton sigue avanzando, recalculamos
 					x = Vector3(xp);
 					xp = Vector3(x + w*lambda);
@@ -409,7 +413,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	pN = it.get_normal();
 	//////////////// FIN DE REBOTES //////////////////
 	
-	Vector3 Lobjeto;
+	Vector3 Ldifusa;
+	Vector3 Lcaustica;
 
 	if(debug == 1 || debug == 3 || debug == 4){
 		// TERMINO AMBIENTAL
@@ -475,9 +480,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
 			Real area = 3.14 * std::pow(max_distance, 2);
-			L += sumatorio / area;
+			//L += sumatorio / area;
 
-			Lobjeto = sumatorio / area; // para la ecuacion volumetrica -> L(xs -> w)
+			Ldifusa = sumatorio / area; // para la ecuacion volumetrica -> L(xs -> w)
 		}
 		/////////////////////////////////////////////////////////////////////////
 		// FOTONES CAUSTICOS
@@ -496,7 +501,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
 			area = 3.14 * std::pow(max_distance, 2);
-			L += sumatorio / area;
+			//L += sumatorio / area;
+
+			Lcaustica = sumatorio / area;
+
 		}
 		////////////////////////////////////////////////////////////////////////
 
@@ -513,8 +521,10 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		// FOTONES VOLUMETRICOS
 		if(!m_volumetric_map.is_empty()){
 
+			double e = 2.7189;
+
 			// Coeficientes (caracteristicas medio participativo)
-			double sigmaT = 0.01;				// Coeficiente de extincion
+			double sigmaT = 0.1;				// Coeficiente de extincion
 			double sigmaS = fRand(0,sigmaT);	// Coeficiente de scattering
 			double sigmaA = sigmaT - sigmaS;	// Coeficiente de absorcion
 			double landa = 0.5;			// 1 / sigmaT (mean-free path?)
@@ -537,13 +547,15 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double phaseFunction = 1.0 / (4.0*3.14159);
 
 			// Calculos ECUACION VOLUMETRICA DE RENDER //
-			Real Ts = Vector3(xs - x).length() * sigmaT; // ||xs - x|| * sigmaT
-
-			// Lobjeto (calculada con los fotones difusos mas arriba en el codigo)
-			// Vector3 Lobjeto;
+			// e^ -(||xs - x|| * sigmaT)
+			Real Ts = pow(e, (-1) * (Vector3(xs - x).length() * sigmaT));
+			
+			// Lobjeto (calculada con los fotones difusos y causticos mas arriba en el codigo)
+			// Vector3 Lobjeto = Ldifusa + Lcaustica;
 
 			// Calcula ray marching
-			Vector3 sumatorio = Vector3(0);
+			Vector3 sumLi = Vector3(0);
+			Vector3 sumTt = Vector3(0);
 			while(dirComp.dot(w) >= 0)
 			{
 
@@ -554,7 +566,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				xp.push_back(xt.getComponent(2));
 
 				// Transmitancia hasta punto xt
-				Real Tt = Vector3(xt - x).length() * sigmaS; // ||xt - x|| * sigmaS
+				// e^ -(||xt - x|| * sigmaT)
+				Real Tt = pow(e, (-1) * (Vector3(xt - x).length() * sigmaT));
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
@@ -570,7 +583,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 					Li += phaseFunction * photon.flux / volumen;
 				}
 
-				sumatorio += Tt * sigmaS * Li;
+				sumLi += Li;
+				sumTt += (1 - Tt) / sigmaT;
 
 				// Obtiene el nuevo punto (xt)
 				x = Vector3(xt);
@@ -579,7 +593,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			L += Ts * Lobjeto + sumatorio;
+			L += Ts * (Ldifusa + Lcaustica) + (sigmaS * sumLi * sumTt);
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
