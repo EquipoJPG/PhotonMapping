@@ -663,7 +663,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 origen = it.get_ray().get_origin();
 	Vector3 destino = it.get_position();
 	Real transmit = pow(e, (-1) * (Vector3(destino - origen).length() * globalST));
-	L += ((LDirecta + LDifusa + LCaustica) *transmit) + LScattering;
+	L += ((LDirecta) *transmit) + LDifusa + LCaustica + LScattering;
 
 	return L;
 }
