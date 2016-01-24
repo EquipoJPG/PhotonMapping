@@ -260,7 +260,7 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
-	double sigmaS = 0.8;
+	double sigmaS = 0.3;
 	double sigmaA = 0.1;
 	double sigmaT = sigmaS + sigmaA;
 	double lambda = 0.04;
@@ -587,6 +587,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			Vector3 sumLi = Vector3(0);
 			Vector3 sumTt = Vector3(0);
 			Vector3 sumInScattering = Vector3(0);
+			Vector3 LK = Vector3(0);
+			Vector3 LKPrev = Vector3(0);
 			while(dirComp.dot(w) >= 0 && itV.did_hit())
 			{
 
@@ -599,7 +601,15 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				// Transmitancia hasta punto xt
 				// e^ -(||xt - x|| * sigmaT)
 				Real Tt = pow(e, (-1) * (Vector3(xt - xOriginal).length() * sigmaT));
-				//cout << "Tt: " << Tt << endl;
+				
+				Vector3 Lid = Vector3(0);
+				// Luz directa
+				for(int i = 0; i < world->nb_lights(); i++){
+					Vector3 lightPos = world->light(i).get_position();
+					double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
+					Vector3 intensity = world->light(i).get_intensities();
+					Lid += Tr * intensity;
+				}
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
@@ -607,16 +617,31 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				m_volumetric_map.find(xp, m_nb_photons * 2, nearest_photons, radio);
 				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radio,3);
 
-				// Calcula Li (luz proveniente del evento in-scattering)
-				Vector3 Li = Vector3(0);
+				// Calcula Lii (luz proveniente del evento in-scattering)
+				Vector3 Lii = Vector3(0);
 
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
-					Li += phaseFunction * ((photon.flux / m_volumetric_map.nb_elements()) / volumen);
+					Lii += phaseFunction * ((photon.flux / m_volumetric_map.nb_elements()) / volumen);
 				}
 				
+				Lii = Lii * (1.0/sigmaS);
+				Lii = Lii * (sigmaS/sigmaT);
+
+				// Calculo Li
+				Vector3 Li = Vector3(0);
+				Li = Lid + Lii;
+
+				// Luz paso k esimo
+				Vector3 deltaXk = Vector3(xt - x);
+				float epsilon = std::pow(e,(-1.0) * sigmaT * deltaXk.length());
+
+				LK = (deltaXk.length() * sigmaS * Li) + LKPrev * epsilon;
+				LKPrev = Vector3(LK);
+
+
 				// Calcula la radiancia ganada por in-scattering
-				sumInScattering += Tt * sigmaS * Li;
+				//sumInScattering += Tt * sigmaS * Li;
 				
 				//sumLi += (1 - Tt) / sigma;
 				//sumTt += (1 - Tt) / sigmaT;
@@ -628,7 +653,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			L = (sumInScattering);
+			L = LK;
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
