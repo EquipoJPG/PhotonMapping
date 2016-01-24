@@ -80,7 +80,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			double sigmaT = sT;	// Coeficiente de extincion
 			double sigmaS = sS;	// Coeficiente de scattering
 			double sigmaA = sA;	// Coeficiente de absorcion
-
+			double e = 2.7189;
 			bool absorbido = false;
 			double lambda = landa;			// Lambda (mean-free path = 1 / sigmaT)
 
@@ -97,18 +97,20 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			int max_pasitos = 30;
 
 			// Mientras no se haya pasado del punto de interseccion
-			while(dirComp.dot(w) >= 0 && !absorbido 
-				&& (pasitos < max_pasitos || hasHit))
+			while(dirComp.dot(w) >= 0 && !absorbido &&
+				pasitos < max_pasitos)
 			{
 				// Ruleta rusa para saber si el foton continua avanzando
 				double ruletitaRusa = fRand(0,1);
+				Real Tt = 1.0 - pow(e, (-1) * (Vector3(xp - x).length() * sigmaT));
 				
 
-				if(ruletitaRusa <= sigmaT)
+				if(ruletitaRusa <= Tt)
 				{
+					ruletitaRusa = fRand(0,1);
 
 					// El foton se ve alterado, se ha producido un evento
-					if(ruletitaRusa >= sigmaS)
+					if(ruletitaRusa <= sigmaS/sigmaT)
 					{
 						// Evento de scattering
 
@@ -163,9 +165,6 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 				}
 				else
 				{
-					// Se guarda el foton si queda espacio en el mapa de volumen
-					if( volumetric_photons.size() < m_nb_volumetric_photons )
-						volumetric_photons.push_back( Photon(xp, dirComp, energy));
 
 					// El foton sigue avanzando, recalculamos
 					x = Vector3(xp);
@@ -232,7 +231,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 	}
 	
 	if( caustic_photons.size() == m_nb_caustic_photons && 
-		global_photons.size() == m_nb_global_photons )
+		global_photons.size() == m_nb_global_photons &&
+		volumetric_photons.size() == m_nb_volumetric_photons)
 	{
 		m_max_nb_shots = m_nb_current_shots-1;
 		return false;
@@ -260,9 +260,9 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
-	double sigmaT = 0.3;
-	double sigmaS = fRand(0,sigmaT);
-	double sigmaA = sigmaT - sigmaS;
+	double sigmaS = 0.8;
+	double sigmaA = 0.1;
+	double sigmaT = sigmaS + sigmaA;
 	double lambda = 0.04;
 	globalST = sigmaT;
 	globalSS = sigmaS;
@@ -277,7 +277,7 @@ void PhotonMapping::preprocess()
 		Vector3 lightIntensity = world->light(i).get_intensities();
 		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
 		//Vector3 photonFlux(lightIntensity / lightIntensity);	// energia foton = lightIntensity
-		Vector3 photonFlux(lightIntensity / m_max_nb_shots);	// energia foton = lightIntensity / total fotones
+		Vector3 photonFlux(lightIntensity);	// energia foton = lightIntensity / total fotones
 
 		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
 		// de la esfera. El numero de fotones lanzados es el maximo definido por
@@ -439,7 +439,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 Ldifusa;
 	Vector3 Lcaustica;
 
-	if(debug == 1 || debug == 3 || debug == 4){
+	if(debug == 1 || debug == 3 || debug == 4 || debug == 5){
 		// TERMINO AMBIENTAL
 		L += world->get_ambient() * it.intersected()->material()->get_albedo(it);
 	
@@ -498,7 +498,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it) * ((max_distance - distance) / max_distance);
+				sumatorio += (photon.flux/(double) m_global_map.nb_elements()) * it.intersected()->material()->get_albedo(it) * ((max_distance - distance) / max_distance);
 			}
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
@@ -524,7 +524,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += photon.flux * it.intersected()->material()->get_albedo(it) * ((max_distance - distance) / max_distance);
+				sumatorio += (photon.flux/(double) m_caustics_map.nb_elements()) * it.intersected()->material()->get_albedo(it) * ((max_distance - distance) / max_distance);
 			}
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
@@ -543,7 +543,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		//cout << "Luz final(verde): " << L.getComponent(1) << "\n";
 		//cout << "Luz final(azul): " << L.getComponent(2) << "\n";
 	}
-	if(debug == 4)
+	if(debug == 4 || debug == 5)
 	{
 		/////////////////////////////////////////////////////////////////////////
 		// FOTONES VOLUMETRICOS
@@ -555,7 +555,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double sigmaT = globalST;				// Coeficiente de extincion
 			double sigmaS = globalSS;	// Coeficiente de scattering
 			double sigmaA = globalSA;	// Coeficiente de absorcion
-			double landa = 0.2;			// 1 / sigmaT (mean-free path?)
+			double landa = 0.5;			// 1 / sigmaT (mean-free path?)
 
 			Intersection itV(it0);		// Copiamos la interseccion por si acaso
 
@@ -587,7 +587,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			Vector3 sumLi = Vector3(0);
 			Vector3 sumTt = Vector3(0);
 			Vector3 sumInScattering = Vector3(0);
-			while(dirComp.dot(w) >= 0)
+			while(dirComp.dot(w) >= 0 && itV.did_hit())
 			{
 
 				// NUEVO PASO EN RAY MARCHING
@@ -604,7 +604,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
 				std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
-				m_volumetric_map.find(xp, m_nb_photons + 5, nearest_photons, radio);
+				m_volumetric_map.find(xp, m_nb_photons * 2, nearest_photons, radio);
 				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radio,3);
 
 				// Calcula Li (luz proveniente del evento in-scattering)
@@ -612,9 +612,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
-					Li += phaseFunction * photon.flux / volumen;
+					Li += phaseFunction * ((photon.flux / m_volumetric_map.nb_elements()) / volumen);
 				}
-
+				
 				// Calcula la radiancia ganada por in-scattering
 				sumInScattering += Tt * sigmaS * Li;
 				
@@ -628,7 +628,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			L = Ts * L + (sumInScattering);
+			L = (sumInScattering);
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
