@@ -435,13 +435,14 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	pI = it.get_position();	// punto de interseccion (x,y,z)
 	pN = it.get_normal();
 	//////////////// FIN DE REBOTES //////////////////
-	
-	Vector3 Ldifusa;
-	Vector3 Lcaustica;
+	Vector3 LDirecta = Vector3(0);
+	Vector3 LDifusa = Vector3(0);
+	Vector3 LCaustica = Vector3(0);
+	Vector3 LScattering = Vector3(0);
 
 	if(debug == 1 || debug == 3 || debug == 4 || debug == 5){
 		// TERMINO AMBIENTAL
-		L += world->get_ambient() * it.intersected()->material()->get_albedo(it);
+		LDirecta += world->get_ambient() * it.intersected()->material()->get_albedo(it);
 	
 		// LUZ DIRECTA //
 		for(int i = 0; i < world->nb_lights(); i++){
@@ -459,7 +460,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Vector3 Id = lt->get_incoming_light(pI);
 				Vector3 Kd = it.intersected()->material()->get_albedo(it);
 				float cos = shadowRay.dot(pN);
-				L += Kd * Id * cos;
+				LDirecta += Kd * Id * cos;
 
 				// TERMINO ESPECULAR: no hay porque son superficies lambertianas
 			}
@@ -503,7 +504,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
 			Real area = 3.14 * std::pow(max_distance, 2);
-			L += sumatorio / area;
+			LDifusa += sumatorio / area;
 
 			//Ldifusa = sumatorio / area; // para la ecuacion volumetrica -> L(xs -> w)
 		}
@@ -529,7 +530,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
 			area = 3.14 * std::pow(max_distance, 2);
-			L += sumatorio / area;
+			LCaustica += sumatorio / area;
 
 			//Lcaustica = sumatorio / area;
 
@@ -604,12 +605,12 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				
 				Vector3 Lid = Vector3(0);
 				// Luz directa
-				for(int i = 0; i < world->nb_lights(); i++){
-					Vector3 lightPos = world->light(i).get_position();
-					double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
-					Vector3 intensity = world->light(i).get_intensities();
-					Lid += Tr * intensity;
-				}
+//				for(int i = 0; i < world->nb_lights(); i++){
+	//				Vector3 lightPos = world->light(i).get_position();
+		//			double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
+			//		Vector3 intensity = world->light(i).get_intensities();
+				//	Lid += Tr * intensity;
+				//}
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
@@ -653,10 +654,11 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			L = LK;
+			LScattering += LK;
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
 
+	L += LDifusa + LCaustica + LScattering;
 	return L;
 }
