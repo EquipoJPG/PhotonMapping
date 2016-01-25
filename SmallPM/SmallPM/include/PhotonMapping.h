@@ -42,6 +42,9 @@ class PhotonMapping
 	double globalSS;
 	double globalSA;
 	double globalLambda;
+	int globalDifusos;
+	int globalCausticos;
+	int globalScattering;
 
 
 	unsigned int m_nb_photons;

@@ -270,10 +270,13 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
+	globalDifusos = 0;
+	globalCausticos = 0;
+	globalScattering = 0;
 
 	//////////////////// AJUSTE DE VARIABLES PARA SCATTERING ////////////////////
-	double sigmaS = 0.3;
-	double sigmaA = 0.1;
+	double sigmaS = 0.1;
+	double sigmaA = 0.05;
 	double sigmaT = sigmaS + sigmaA;
 	double lambda = 0.04;
 	// Las globales las usa la funcion de shade para no pasarlas por parametro
@@ -320,6 +323,12 @@ void PhotonMapping::preprocess()
 			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, volumetricPhotons, participativeRoom, false, sigmaT,
 				sigmaS, sigmaA, lambda);
 
+			if(globalPhotons.size() > 0)
+				globalDifusos++;
+			if(causticPhotons.size() > 0)
+				globalCausticos++;
+			if(volumetricPhotons.size() > 0)
+				globalScattering++;
 			// Almacena las colisiones de los fotones difusos
 			int k;
 			for (k = 0; k < globalPhotons.size(); k++) {
@@ -375,9 +384,9 @@ void PhotonMapping::preprocess()
 	}
 
 	cout << m_nb_current_shots << "/" << m_max_nb_shots << endl;
-	cout << "GP: " << gp << endl;
-	cout << "CP: " << cp << endl;
-	cout << "VP: " << vp << endl;
+	cout << "GP: " << gp << " globalDifusos: " << globalDifusos << endl;
+	cout << "CP: " << cp << " globalCausticos: " << globalCausticos << endl;
+	cout << "VP: " << vp << " globalScattering: " << globalScattering << endl;
 
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
 	if(gp > 0){
@@ -514,7 +523,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += (photon.flux/(double) m_global_map.nb_elements()) * 
+				sumatorio += (photon.flux/(double) globalDifusos) * 
 									it.intersected()->material()->get_albedo(it) * 
 									((max_distance - distance) / max_distance);
 			}
@@ -542,7 +551,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += (photon.flux/(double) m_caustics_map.nb_elements()) * 
+				sumatorio += (photon.flux/(double) globalCausticos) * 
 									it.intersected()->material()->get_albedo(it) * 
 									((max_distance - distance) / max_distance);
 			}
@@ -616,7 +625,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 					Vector3 lightPos = world->light(i).get_position();
 					double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
 					Vector3 intensity = world->light(i).get_intensities();
-					Lid += Tr * intensity;
+					Lid += Tr * (intensity/globalScattering);
 				}
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
@@ -630,7 +639,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
-					Lii += phaseFunction * ((photon.flux / m_volumetric_map.nb_elements()) / volumen);
+					Lii += phaseFunction * ((photon.flux/globalScattering) / volumen);
 				}
 				
 				Lii = Lii * (1.0/sigmaS);
@@ -665,11 +674,23 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		////////////////////////////////////////////////////////////////////////
 	}
 
-	double e = 2.7189;
-	Vector3 origen = it.get_ray().get_origin();
-	Vector3 destino = it.get_position();
-	Real transmit = pow(e, (-1) * (Vector3(destino - origen).length() * globalST));
-	L += ((LDirecta) *transmit) + LDifusa + LCaustica + LScattering;
+	Real transmit = 0;
+	if(debug == 4)
+	{
+		double e = 2.7189;
+		Vector3 origen = it.get_ray().get_origin();
+		Vector3 destino = it.get_position();
+		transmit = pow(e, (-1) * (Vector3(destino - origen).length() * globalST));
+	}
 
+//	cout << LScattering.getComponent(0) << endl;
+//	cout << LScattering.getComponent(1) << endl;
+//	cout << LScattering.getComponent(2) << endl;
+//	cout << transmit << endl;
+	L += ((transmit) * (LDirecta + LDifusa + LCaustica)) + LScattering;
+//	cout << L.getComponent(0) << endl;
+//	cout << L.getComponent(1) << endl;
+//	cout << L.getComponent(2) << endl;
+//	cout << "===============" << endl;
 	return L;
 }
