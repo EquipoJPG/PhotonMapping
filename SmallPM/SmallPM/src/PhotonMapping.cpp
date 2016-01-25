@@ -70,13 +70,45 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		Intersection it;
 		world->first_intersection(photon_ray, it);
 
-		bool hasHit = it.did_hit();
+		if( !it.did_hit() )
+			break;
 
+		// Atenua la energia del foton
+		Vector3 energyOriginal = Vector3(energy);
+		double e = 2.7189;
+		Real dist = Vector3(it.get_position() - photon_ray.get_origin()).length();
+		Real Ts = std::pow(e, (-1) * (dist * sT));
+		energy = Vector3(energy * Ts);
+
+		//Check if has hit a delta material...
+		if( it.intersected()->material()->is_delta() )
+		{
+			// If delta material, then is caustic...
+			// Don't store the photon!
+			is_caustic_particle = true;
+		}
+		else if (photon_ray.get_level() > 0 || direct)
+		{
+			//If non-delta material, store the photon!
+			if( is_caustic_particle )	
+			{				
+				//If caustic particle, store in caustics
+				if( caustic_photons.size() < m_nb_caustic_photons )
+					caustic_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
+			}
+			else						
+			{
+				//If non-caustic particle, store in global
+				if( global_photons.size() < m_nb_global_photons )
+					global_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
+			}
+			is_caustic_particle = false;
+		}	
+		
 		////////////////// CODIGO MEDIO PARTICIPATIVO ///////////////////
 		// Se considera que toda la sala es medio participativo
 		if(participative)
 		{
-
 			// Coeficientes (caracteristicas medio participativo)
 			// Vienen dados por variables globales que se establecen en preprocess
 			// Aunque a trace_ray se le pasan por parametro
@@ -86,6 +118,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			double e = 2.7189;
 			bool absorbido = false;
 			double lambda = landa;			// Lambda (mean-free path = 1 / sigmaT)
+			Vector3 scatteringEnergy = Vector3(energyOriginal);
 
 			// Para cada paso
 			Vector3 x(photon_ray.get_origin());			// Inicio
@@ -120,7 +153,10 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 					// El foton se ve alterado, se ha producido un evento
 					if(ruletitaRusa <= sigmaS/sigmaT)
 					{
-						// Evento de scattering
+						// Evento de SCATTERING
+
+						// Atenua la energia del foton que ha sufrido scattering
+						energy = Vector3(scatteringEnergy * Tt);
 
 						// Se guarda el foton si queda espacio en el mapa de volumen
 						if( volumetric_photons.size() < m_nb_volumetric_photons )
@@ -185,35 +221,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		}
 		////////////////// FIN MEDIO PARTICIPATIVO ///////////////////
 
-		if( !it.did_hit() )
-			break;
-
-		//Check if has hit a delta material...
-		if( it.intersected()->material()->is_delta() )
-		{
-			// If delta material, then is caustic...
-			// Don't store the photon!
-			is_caustic_particle = true;
-		}
-		else if (photon_ray.get_level() > 0 || direct)
-		{
-			//If non-delta material, store the photon!
-			if( is_caustic_particle )	
-			{				
-				//If caustic particle, store in caustics
-				if( caustic_photons.size() < m_nb_caustic_photons )
-					caustic_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
-			}
-			else						
-			{
-				//If non-caustic particle, store in global
-				if( global_photons.size() < m_nb_global_photons )
-					global_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
-			}
-			is_caustic_particle = false;
-		}	
-		
-		// INICIO RULETA RUSA /////////////
+		/// INICIO RULETA RUSA ///
 		Real pdf;
 
 		Vector3 surf_albedo = it.intersected()->material()->get_albedo(it);
@@ -230,7 +238,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		// Get sampled direction plus pdf, and update attenuation
 		it.intersected()->material()->get_outgoing_sample_ray(it, photon_ray, pdf );
 
-		// FIN RULETA RUSA ///////////////
+		/// FIN RULETA RUSA ///
 
 		// Shade...
 		energy = energy*surf_albedo;
@@ -238,7 +246,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			energy *= dot_abs(it.get_normal(), photon_ray.get_direction())/3.14159;		
 
 		energy = energy /(pdf*avg_surf_albedo);
-	}
+	} // FIN WHILE 1
 	
 	if( caustic_photons.size() == m_nb_caustic_photons && 
 		global_photons.size() == m_nb_global_photons &&
@@ -478,8 +486,13 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Si el objeto es visible se calcula la influencia de la luz
 			if (lt->is_visible(pI)) {
 
+				// Atenua la intensidad de la fuente de luz respecto a la distancia a la que
+				// se encuentra
+				Real e = 2.7189;
+				Real Ts = std::pow(e, (-1) * Vector3(pI - lightPos).length());
+
 				// TERMINO DIFUSO = Kd x Id x (L . N)
-				Vector3 Id = lt->get_incoming_light(pI);
+				Vector3 Id = lt->get_incoming_light(pI) * Ts;
 				Vector3 Kd = it.intersected()->material()->get_albedo(it);
 				float cos = shadowRay.dot(pN);
 				LDirecta += Kd * Id * cos;
@@ -615,7 +628,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				xp.push_back(xt.getComponent(2));
 
 				// Transmitancia hasta punto xt
-				// e^ -(||xt - x|| * sigmaT)
+				// e^ -(|| xt - xOriginal || * sigmaT)
 				Real Tt = pow(e, (-1) * (Vector3(xt - xOriginal).length() * sigmaT));
 				
 				Vector3 Lid = Vector3(0);
@@ -625,7 +638,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 					Vector3 lightPos = world->light(i).get_position();
 					double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
 					Vector3 intensity = world->light(i).get_intensities();
-					Lid += Tr * (intensity/globalScattering);
+					//Lid += Tr * (intensity/globalScattering);
+					Lid += Tr * intensity * 1/4*3.14159 / std::pow(Vector3(lightPos - x).length(),2) * sigmaS;
 				}
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
@@ -648,33 +662,18 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				// Calculo Li
 				Vector3 Li = Vector3(0);
 				Li = Lid + Lii;
-
-				// Luz paso k esimo
-				Vector3 deltaXk = Vector3(xt - x);
-				float epsilon = std::pow(e,(-1.0) * sigmaT * deltaXk.length());
-
-				LK = (deltaXk.length() * sigmaS * Li) + LKPrev * epsilon;
-				LKPrev = Vector3(LK);
+				LScattering += Lii; // TODO LScattering += Li
 				
-				// Calcula la radiancia ganada por in-scattering
-				//sumInScattering += Tt * sigmaS * Li;
-				
-				//sumLi += (1 - Tt) / sigma;
-				//sumTt += (1 - Tt) / sigmaT;
-
 				// Obtiene el nuevo punto (xt)
 				x = Vector3(xt);
 				xt = Vector3(x + w*landa);
 				dirComp = Vector3(xs - xt);
 			}
-
-			/// ECUACION VOLUMETRICA DE RENDER FINAL ///
-			LScattering += LK;
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
 
-	Real transmit = 0;
+	Real transmit = 1;
 	if(debug == 4)
 	{
 		double e = 2.7189;
@@ -683,14 +682,6 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		transmit = pow(e, (-1) * (Vector3(destino - origen).length() * globalST));
 	}
 
-//	cout << LScattering.getComponent(0) << endl;
-//	cout << LScattering.getComponent(1) << endl;
-//	cout << LScattering.getComponent(2) << endl;
-//	cout << transmit << endl;
-	L += ((transmit) * (LDirecta + LDifusa + LCaustica)) + LScattering;
-//	cout << L.getComponent(0) << endl;
-//	cout << L.getComponent(1) << endl;
-//	cout << L.getComponent(2) << endl;
-//	cout << "===============" << endl;
+	L = ((transmit) * (LDirecta + LDifusa + LCaustica)) + LScattering;
 	return L;
 }
