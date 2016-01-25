@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
 	{
 	case 1:
 	{	
-		Object3D* sphere1 = new Sphere(Vector3(0.5,0.3,.5), 0.3, glass);
+		Object3D* sphere1 = new Sphere(Vector3(0.5,1,-0.5), 0.3, glass);
 		w->add_object(sphere1);
 
 		Object3D* sphere2 = new Sphere(Vector3(-0.5,0.5,.5), 0.3, mirror);
