@@ -73,10 +73,13 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		bool hasHit = it.did_hit();
 
 		////////////////// CODIGO MEDIO PARTICIPATIVO ///////////////////
+		// Se considera que toda la sala es medio participativo
 		if(participative)
 		{
 
 			// Coeficientes (caracteristicas medio participativo)
+			// Vienen dados por variables globales que se establecen en preprocess
+			// Aunque a trace_ray se le pasan por parametro
 			double sigmaT = sT;	// Coeficiente de extincion
 			double sigmaS = sS;	// Coeficiente de scattering
 			double sigmaA = sA;	// Coeficiente de absorcion
@@ -84,28 +87,34 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			bool absorbido = false;
 			double lambda = landa;			// Lambda (mean-free path = 1 / sigmaT)
 
-			// Siguiente paso
+			// Para cada paso
 			Vector3 x(photon_ray.get_origin());			// Inicio
 			Vector3 xs(it.get_position());				// Interseccion
 			Vector3 w(photon_ray.get_direction());		// Direccion del rayo
 
-			// Comprobacion de estar en el medio participativo
-			Vector3 xp(x + w*lambda);			// Nuevo punto a comprobar
-			Vector3 dirComp(xs - xp);			// Direccion de comprobar
+			// Variables que indican el nuevo punto de cada paso y la direccion de cada paso
+			Vector3 xp(x + w*lambda);				// Nuevo punto a comprobar
+			Vector3 dirComp(xs - xp);				// Direccion a comprobar
 
+			// Estas variables se usan para el caso en el que el rayo no interseccione con nada de la escena
+			// De tal forma que iterara un maximo de 'max_pasitos' veces (Nota esto es una solucion propia que no
+			// figura en ningun paper
 			int pasitos = 0;
 			int max_pasitos = 30;
 
-			// Mientras no se haya pasado del punto de interseccion
+			// Mientras no se haya pasado del punto de interseccion y no se haya absorbido y los pasitos sean menores
+			// que max_pasitos (esto ultimo solo si no ha habido interseccion)
 			while(dirComp.dot(w) >= 0 && !absorbido &&
 				pasitos < max_pasitos)
 			{
 				// Ruleta rusa para saber si el foton continua avanzando
 				double ruletitaRusa = fRand(0,1);
+				// Calculo de la transmitancia en este paso
 				Real Tt = 1.0 - pow(e, (-1) * (Vector3(xp - x).length() * sigmaT));
 
 				if(ruletitaRusa <= Tt)
 				{
+					// Otra generacion aleatoria para ver si es scattering o absorcion
 					ruletitaRusa = fRand(0,1);
 
 					// El foton se ve alterado, se ha producido un evento
@@ -117,8 +126,6 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 						if( volumetric_photons.size() < m_nb_volumetric_photons )
 							volumetric_photons.push_back( Photon(xp, dirComp, energy));
 
-						Intersection temp;
-						
 						// Calcula nueva direccion aleatoria
 						// Funcion de fase es constante (1/4PI),
 						// asi que la direccion es aleatoria
@@ -127,8 +134,11 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 						yd = fRand(-1,1);
 						zd = fRand(-1,1);
 						Vector3 photonDir(xd,yd,zd);
-						Ray* tempRay = new Ray(xp, photonDir);
-													
+
+						// Como nos hemos desviado necesitamos una nueva interseccion
+						// con la que comprobar si nos hemos pasado de la escena
+						Intersection temp;
+						Ray* tempRay = new Ray(xp, photonDir);								
 						world->first_intersection(*tempRay, temp);
 						
 						if( !temp.did_hit() )
@@ -139,6 +149,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 							// se siguen dando algunos pasos mas
 							pasitos++;
 						}
+
+						// Si ya hemos dado muchos pasos
 						if (pasitos >= max_pasitos) {
 							absorbido = true;
 						}
@@ -258,15 +270,20 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
+
+	//////////////////// AJUSTE DE VARIABLES PARA SCATTERING ////////////////////
 	double sigmaS = 0.3;
 	double sigmaA = 0.1;
 	double sigmaT = sigmaS + sigmaA;
 	double lambda = 0.04;
+	// Las globales las usa la funcion de shade para no pasarlas por parametro
 	globalST = sigmaT;
 	globalSS = sigmaS;
 	globalSA = sigmaA;
 	globalLambda = lambda;
 	bool participativeRoom = true;
+	////////////////////// FIN AJUSTE VARIABLES SCATTERING //////////////////////
+
 	// Muestrea las fuentes de luz de la escena
 	for(int i = 0; i < world->nb_lights(); i++){
 		
@@ -366,7 +383,7 @@ void PhotonMapping::preprocess()
 	if(gp > 0){
 		m_global_map.balance();
 	}
-	//cout << m_global_map.nb_elements() << "\n";
+
 	if(cp > 0){
 		m_caustics_map.balance();
 	}
@@ -434,7 +451,8 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 LCaustica = Vector3(0);
 	Vector3 LScattering = Vector3(0);
 
-	if(debug == 1 || debug == 3 || debug == 4 || debug == 5){
+	////////////////////////////// LUZ DIRECTA /////////////////////////////////////////
+	if(debug == 1 || debug == 3 || debug == 4){
 		// TERMINO AMBIENTAL
 		LDirecta += world->get_ambient() * it.intersected()->material()->get_albedo(it);
 	
@@ -461,6 +479,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 		}
 	}
+	/////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////// LUZ INDIRECTA /////////////////////////////////////
 	if(debug == 2 || debug == 3 || debug == 4){
 		/// LUZ INDIRECTA ///
 		// pI = punto de interseccion (x,y,z)
@@ -504,7 +525,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		}
 		/////////////////////////////////////////////////////////////////////////
 
-		/// FOTONES CAUSTICOS ///
+		///////////////////////// COMPONENTE CAUSTICA //////////////////////////////////////
 		if(!m_caustics_map.is_empty()){
 			m_caustics_map.find(intersection, m_nb_photons, nearest_photons, max_distance);
 			sumatorio = Vector3(0);
@@ -532,11 +553,11 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		}
 		////////////////////////////////////////////////////////////////////////
 	}
+
+	/////////////////////// FOTONES VOLUMETRICOS //////////////////////////////
 	if(debug == 4 || debug == 5)
 	{
-		/////////////////////////////////////////////////////////////////////////
-
-		/// FOTONES VOLUMETRICOS ///
+		
 		if(!m_volumetric_map.is_empty()){
 
 			double e = 2.7189;
@@ -545,7 +566,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			double sigmaT = globalST;		// Coeficiente de extincion
 			double sigmaS = globalSS;		// Coeficiente de scattering
 			double sigmaA = globalSA;		// Coeficiente de absorcion
-			double landa = 0.5;				// 1 / sigmaT (mean-free path?)
+			double landa = 0.5;				// Asignado arbitrariamente. Puede ser 1 / sigmaT? (mean-free path?)
 
 			Intersection itV(it0);
 
@@ -565,10 +586,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			// Funcion de fase isotropica (medio participativo homogeneo => 1/(4*PI) )
 			double phaseFunction = 1.0 / (4.0*3.14159);
 
-			// Calculos ECUACION VOLUMETRICA DE RENDER //
+			// ECUACION VOLUMETRICA DE RENDER //
 			// e^ -(||xs - x|| * sigmaT)
 			Real Ts = pow(e, (-1) * (Vector3(xs - xOriginal).length() * sigmaT));
-			//cout << "TS: " << Ts << endl;
 
 			// Calcula ray marching
 			Vector3 sumLi = Vector3(0);
@@ -590,13 +610,14 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real Tt = pow(e, (-1) * (Vector3(xt - xOriginal).length() * sigmaT));
 				
 				Vector3 Lid = Vector3(0);
-				// Luz directa
-//				for(int i = 0; i < world->nb_lights(); i++){
-//					Vector3 lightPos = world->light(i).get_position();
-//					double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
-//					Vector3 intensity = world->light(i).get_intensities();
-//					Lid += Tr * intensity;
-//				}
+				// Luz directa. Este bucle debe estar mal hecho porque provoca una niebla muy densa
+				// que solo se aprecia reduciendo la luz de la imagen en Photoshop
+				for(int i = 0; i < world->nb_lights(); i++){
+					Vector3 lightPos = world->light(i).get_position();
+					double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
+					Vector3 intensity = world->light(i).get_intensities();
+					Lid += Tr * intensity;
+				}
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
