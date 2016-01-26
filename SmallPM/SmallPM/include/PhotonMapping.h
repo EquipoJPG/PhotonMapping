@@ -35,16 +35,14 @@ class PhotonMapping
 {
 	World *world;
 	
-	unsigned int m_max_nb_shots, m_nb_global_photons, m_nb_caustic_photons, m_nb_volumetric_photons;
+	unsigned int m_max_nb_shots, m_nb_global_photons, m_nb_caustic_photons, m_nb_volumetric_photons, m_nb_causticvol_photons;
 	unsigned int m_nb_current_shots;
 
 	double globalST;
 	double globalSS;
 	double globalSA;
 	double globalLambda;
-	int globalDifusos;
-	int globalCausticos;
-	int globalScattering;
+	bool globalParticipative;
 
 
 	unsigned int m_nb_photons;
@@ -64,7 +62,7 @@ class PhotonMapping
 			position(p), direction(d), flux(f) {}
 	};
 
-	KDTree<Photon, 3> m_global_map, m_caustics_map, m_volumetric_map;
+	KDTree<Photon, 3> m_global_map, m_caustics_map, m_volumetric_map, m_causticvol_map;
 
 	// Compute the photons by tracing the Ray 'r' from the light source
 	// through the scene, and by storing the intersections with matter
@@ -81,7 +79,8 @@ class PhotonMapping
 	bool trace_ray(const Ray& r, const Vector3 &p, 
 			   std::list<Photon> &global_photons, 
 			   std::list<Photon> &caustic_photons, 
-			   std::list<Photon> &scatter_photons, 
+			   std::list<Photon> &volumetric_photons,
+			   std::list<Photon> &causticvol_photons,
 			   bool participative, bool direct,
 			   double sT,
 			   double sS,
@@ -90,10 +89,10 @@ class PhotonMapping
 public:
 
  	PhotonMapping( World *_world, unsigned int nb_global_photons, unsigned int nb_caustic_photons, unsigned int nb_volumetric_photons,
-				   unsigned int max_nb_shots, unsigned int nb_photons, bool raytraced_direct = true): 
+				   unsigned int nb_causticvol_photons, unsigned int max_nb_shots, unsigned int nb_photons, bool raytraced_direct = true): 
  		world(_world), m_max_nb_shots(max_nb_shots), m_nb_current_shots(0),
 		m_nb_global_photons(nb_global_photons), m_nb_caustic_photons(nb_caustic_photons), m_nb_volumetric_photons(nb_volumetric_photons),
-		m_nb_photons(nb_photons), m_raytraced_direct(raytraced_direct)
+		m_nb_causticvol_photons(nb_causticvol_photons), m_nb_photons(nb_photons), m_raytraced_direct(raytraced_direct)
 	{ }
 	
 	// Preprocess the photon map. This needs to be run before rendering,

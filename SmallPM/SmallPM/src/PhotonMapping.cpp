@@ -41,7 +41,8 @@ double fRand(double fMin, double fMax)
 bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p, 
 			   std::list<Photon> &global_photons, 
 			   std::list<Photon> &caustic_photons, 
-			   std::list<Photon> &volumetric_photons, 
+			   std::list<Photon> &volumetric_photons,
+			   std::list<Photon> &causticvol_photons,
 			   bool participative, bool direct,
 			   double sT,
 			   double sS,
@@ -78,33 +79,10 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		double e = 2.7189;
 		Real dist = Vector3(it.get_position() - photon_ray.get_origin()).length();
 		Real Ts = std::pow(e, (-1) * (dist * sT));
+		if(!globalParticipative)
+			Ts = 1;
 		energy = Vector3(energy * Ts);
 
-		//Check if has hit a delta material...
-		if( it.intersected()->material()->is_delta() )
-		{
-			// If delta material, then is caustic...
-			// Don't store the photon!
-			is_caustic_particle = true;
-		}
-		else if (photon_ray.get_level() > 0 || direct)
-		{
-			//If non-delta material, store the photon!
-			if( is_caustic_particle )	
-			{				
-				//If caustic particle, store in caustics
-				if( caustic_photons.size() < m_nb_caustic_photons )
-					caustic_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
-			}
-			else						
-			{
-				//If non-caustic particle, store in global
-				if( global_photons.size() < m_nb_global_photons )
-					global_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
-			}
-			is_caustic_particle = false;
-		}	
-		
 		////////////////// CODIGO MEDIO PARTICIPATIVO ///////////////////
 		// Se considera que toda la sala es medio participativo
 		if(participative)
@@ -162,6 +140,10 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 						if( volumetric_photons.size() < m_nb_volumetric_photons )
 							volumetric_photons.push_back( Photon(xp, dirComp, energy));
 
+						// Se guarda el foton si queda espacio en el mapa de volumen
+						if( is_caustic_particle && causticvol_photons.size() < m_nb_causticvol_photons )
+							causticvol_photons.push_back( Photon(xp, dirComp, energy));
+
 						// Calcula nueva direccion aleatoria
 						// Funcion de fase es constante (1/4PI),
 						// asi que la direccion es aleatoria
@@ -208,6 +190,10 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 						// El foton se guarda si el mapa de volumen no esta lleno
 						if( volumetric_photons.size() < m_nb_volumetric_photons )
 							volumetric_photons.push_back( Photon(xp, dirComp, energy));
+
+						// Se guarda el foton si queda espacio en el mapa de volumen
+						if( is_caustic_particle && causticvol_photons.size() < m_nb_causticvol_photons )
+							causticvol_photons.push_back( Photon(xp, dirComp, energy));
 					}
 				}
 				else
@@ -220,6 +206,31 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			}
 		}
 		////////////////// FIN MEDIO PARTICIPATIVO ///////////////////
+
+		//Check if has hit a delta material...
+		if( it.intersected()->material()->is_delta() )
+		{
+			// If delta material, then is caustic...
+			// Don't store the photon!
+			is_caustic_particle = true;
+		}
+		else if (photon_ray.get_level() > 0 || direct)
+		{
+			//If non-delta material, store the photon!
+			if( is_caustic_particle )	
+			{				
+				//If caustic particle, store in caustics
+				if( caustic_photons.size() < m_nb_caustic_photons )
+					caustic_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
+			}
+			else						
+			{
+				//If non-caustic particle, store in global
+				if( global_photons.size() < m_nb_global_photons )
+					global_photons.push_back( Photon(it.get_position(), photon_ray.get_direction(), energy ));
+			}
+			is_caustic_particle = false;
+		}	
 
 		/// INICIO RULETA RUSA ///
 		Real pdf;
@@ -278,13 +289,11 @@ void PhotonMapping::preprocess()
 	int gp = 0;
 	int cp = 0;
 	int vp = 0;
-	globalDifusos = 0;
-	globalCausticos = 0;
-	globalScattering = 0;
+	int kp = 0;
 
 	//////////////////// AJUSTE DE VARIABLES PARA SCATTERING ////////////////////
-	double sigmaS = 0.1;
-	double sigmaA = 0.05;
+	double sigmaS = 0.8;
+	double sigmaA = 0.8;
 	double sigmaT = sigmaS + sigmaA;
 	double lambda = 0.04;
 	// Las globales las usa la funcion de shade para no pasarlas por parametro
@@ -293,22 +302,23 @@ void PhotonMapping::preprocess()
 	globalSA = sigmaA;
 	globalLambda = lambda;
 	bool participativeRoom = true;
+	globalParticipative = participativeRoom;
 	////////////////////// FIN AJUSTE VARIABLES SCATTERING //////////////////////
 
-	// Muestrea las fuentes de luz de la escena
-	for(int i = 0; i < world->nb_lights(); i++){
+	while (m_nb_current_shots < m_max_nb_shots)
+	{
+		// Muestrea las fuentes de luz de la escena
+		for(int i = 0; i < world->nb_lights(); i++){
 		
-		// Obtiene la fuente de luz i-esima
-		Vector3 lightPos = world->light(i).get_position();
-		Vector3 lightIntensity = world->light(i).get_intensities();
-		LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
-		Vector3 photonFlux(lightIntensity);	// energia foton = lightIntensity
+			// Obtiene la fuente de luz i-esima
+			Vector3 lightPos = world->light(i).get_position();
+			Vector3 lightIntensity = world->light(i).get_intensities();
+			LightSource* lt = new PointLightSource(world, lightPos, lightIntensity);
+			Vector3 photonFlux(lightIntensity);	// energia foton = lightIntensity
 
-		// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
-		// de la esfera. El numero de fotones lanzados es el maximo definido por
-		// la variable 'm_max_nb_shots'
-		while (m_nb_current_shots < m_max_nb_shots)
-		{
+			// Muestreo de una esfera, se lanza un rayo en una direccion aleatoria
+			// de la esfera. El numero de fotones lanzados es el maximo definido por
+			// la variable 'm_max_nb_shots'
 			
 			// REJECTION SAMPLING
 			double x,y,z;
@@ -327,16 +337,11 @@ void PhotonMapping::preprocess()
 			std::list<Photon> globalPhotons;
 			std::list<Photon> causticPhotons;
 			std::list<Photon> volumetricPhotons;
+			std::list<Photon> causticvolPhotons;
 
-			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, volumetricPhotons, participativeRoom, false, sigmaT,
+			trace_ray(*photonRay, photonFlux, globalPhotons, causticPhotons, volumetricPhotons, causticvolPhotons, participativeRoom, false, sigmaT,
 				sigmaS, sigmaA, lambda);
 
-			if(globalPhotons.size() > 0)
-				globalDifusos++;
-			if(causticPhotons.size() > 0)
-				globalCausticos++;
-			if(volumetricPhotons.size() > 0)
-				globalScattering++;
 			// Almacena las colisiones de los fotones difusos
 			int k;
 			for (k = 0; k < globalPhotons.size(); k++) {
@@ -388,13 +393,31 @@ void PhotonMapping::preprocess()
 
 				volumetricPhotons.pop_front(); // elimina el foton almacenado de la lista
 			}
+
+			// Almacena las colisiones de los fotones volumetricos causticos
+			for (k = 0; k < causticvolPhotons.size(); k++) {
+				kp++;
+
+				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
+				Photon photon = causticvolPhotons.front();
+
+				std::vector<Real> photonPosition = std::vector<Real>();
+				photonPosition.push_back(photon.position.getComponent(0));
+				photonPosition.push_back(photon.position.getComponent(1));
+				photonPosition.push_back(photon.position.getComponent(2));
+				
+				m_causticvol_map.store(photonPosition, photon);
+
+				causticvolPhotons.pop_front(); // elimina el foton almacenado de la lista
+			}
 		}
 	}
 
 	cout << m_nb_current_shots << "/" << m_max_nb_shots << endl;
-	cout << "GP: " << gp << " globalDifusos: " << globalDifusos << endl;
-	cout << "CP: " << cp << " globalCausticos: " << globalCausticos << endl;
-	cout << "VP: " << vp << " globalScattering: " << globalScattering << endl;
+	cout << "GP: " << gp << endl;
+	cout << "CP: " << cp << endl;
+	cout << "VP: " << vp << endl;
+	cout << "KP: " << kp << endl;
 
 	// FOTONES ALMACENADOS - PREPROCESO COMPLETADO
 	if(gp > 0){
@@ -407,6 +430,10 @@ void PhotonMapping::preprocess()
 
 	if(vp > 0){
 		m_volumetric_map.balance();
+	}
+
+	if(kp > 0){
+		m_causticvol_map.balance();
 	}
 }
 
@@ -447,8 +474,16 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	int MAX_REB = 3;
 	int rebotes = 0;
 	Ray newRay;
-
+	Real totalTrans = 1;
 	while (it.intersected()->material()->is_delta() && rebotes < MAX_REB) {
+		// Atenuar if neccessary
+		if(globalParticipative){
+			double eD = 2.7189;
+			Vector3 origen = it.get_ray().get_origin();
+			Vector3 destin = it.get_position();
+			Real Ts = std::pow(eD, (-1) * Vector3(destin - origen).length() * globalST);
+			totalTrans = totalTrans * Ts;
+		}
 
 		// Rayo rebotado
 		Real pdf;
@@ -471,7 +506,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	////////////////////////////// LUZ DIRECTA /////////////////////////////////////////
 	if(debug == 1 || debug == 3 || debug == 4){
 		// TERMINO AMBIENTAL
-		LDirecta += world->get_ambient() * it.intersected()->material()->get_albedo(it);
+		//LDirecta += world->get_ambient() * it.intersected()->material()->get_albedo(it);
 	
 		// LUZ DIRECTA //
 		for(int i = 0; i < world->nb_lights(); i++){
@@ -488,9 +523,17 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				// Atenua la intensidad de la fuente de luz respecto a la distancia a la que
 				// se encuentra
-				Real e = 2.7189;
-				Real Ts = std::pow(e, (-1) * Vector3(pI - lightPos).length());
-
+				double eD = 2.7189;
+				Real eR = 2.7189;
+				Real Ts;
+				if(globalParticipative)
+					if(rebotes == 0)
+						Ts = std::pow(eD, (-1) * Vector3(pI - lightPos).length() * globalST);
+					else
+						Ts = totalTrans /** std::pow(eD, (-1) * Vector3(pI - lightPos).length() * globalST)*/;
+				else
+					Ts = 1;
+				
 				// TERMINO DIFUSO = Kd x Id x (L . N)
 				Vector3 Id = lt->get_incoming_light(pI) * Ts;
 				Vector3 Kd = it.intersected()->material()->get_albedo(it);
@@ -536,7 +579,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += (photon.flux/(double) globalDifusos) * 
+				sumatorio += (photon.flux/(double) m_global_map.nb_elements()) * 
 									it.intersected()->material()->get_albedo(it) * 
 									((max_distance - distance) / max_distance);
 			}
@@ -564,7 +607,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real distance = vectorcito.length();
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
-				sumatorio += (photon.flux/(double) globalCausticos) * 
+				sumatorio += (photon.flux/(double) m_caustics_map.nb_elements()) * 
 									it.intersected()->material()->get_albedo(it) * 
 									((max_distance - distance) / max_distance);
 			}
@@ -577,7 +620,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	}
 
 	/////////////////////// FOTONES VOLUMETRICOS //////////////////////////////
-	if(debug == 4 || debug == 5)
+	if(debug == 4)
 	{
 		
 		if(!m_volumetric_map.is_empty()){
@@ -635,17 +678,18 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				// Luz directa. Este bucle debe estar mal hecho porque provoca una niebla muy densa
 				// que solo se aprecia reduciendo la luz de la imagen en Photoshop
 				for(int i = 0; i < world->nb_lights(); i++){
-					Vector3 lightPos = world->light(i).get_position();
-					double Tr = 1.0 - pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
-					Vector3 intensity = world->light(i).get_intensities();
-					//Lid += Tr * (intensity/globalScattering);
-					Lid += Tr * intensity * 1/4*3.14159 / std::pow(Vector3(lightPos - x).length(),2) * sigmaS;
+					if(world->light(i).is_visible(xt)){
+						Vector3 lightPos = world->light(i).get_position();
+						double Tr = pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
+						Vector3 intensity = world->light(i).get_incoming_light(xt);
+						Lid += Tr * intensity; /*(1/(4 * 3.14159 * std::pow(Vector3(lightPos - x).length(),2))) **/
+					}
 				}
 
 				// Obtiene los k fotones cercanos al paso t (xp = xt)
 				float radio = 0;
 				std::vector<const KDTree<Photon, 3>::Node*> nearest_photons;
-				m_volumetric_map.find(xp, m_nb_photons * 2, nearest_photons, radio);
+				m_volumetric_map.find(xp, m_nb_photons, nearest_photons, radio);
 				double volumen = (4.0 / 3.0) * 3.14159 * std::pow(radio,3);
 
 				// Calcula Lii (luz proveniente del evento in-scattering)
@@ -653,7 +697,16 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
-					Lii += phaseFunction * ((photon.flux/globalScattering) / volumen);
+					Lii += phaseFunction * ((photon.flux/m_volumetric_map.nb_elements()) / volumen);
+				}
+
+				// Obtiene los k fotones de causticas volumetricas cercanas al paso t (xp = xt)
+				m_causticvol_map.find(xp, m_nb_photons, nearest_photons, radio);
+				volumen = (4.0 / 3.0) * 3.14159 * std::pow(radio,3);
+
+				for (int i = 0; i < nearest_photons.size(); i++) {
+					Photon photon = nearest_photons.at(i)->data();
+					Lii += phaseFunction * ((photon.flux/m_causticvol_map.nb_elements()) / volumen);
 				}
 				
 				Lii = Lii * (1.0/sigmaS);

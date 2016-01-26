@@ -35,7 +35,7 @@ namespace {
 	Film *film;
 	RenderEngine *engine;
 	PhotonMapping *pm;
-	int sizex = 128, sizey = 128;
+	int sizex = 300, sizey = 300;
 }
 
 
@@ -55,8 +55,9 @@ int main(int argc, char* argv[])
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 
 				 photons_volumetric = 10000,
-				 max_shots = 50000, 
-				 nb_nearest_photons = 20;
+				 photons_causticvol = 10000,
+				 max_shots = 100000, 
+				 nb_nearest_photons = 30;
 
 	// ---------------------------------------------------------------------
 	// Parse input
@@ -146,7 +147,7 @@ int main(int argc, char* argv[])
 	{
 	case 1:
 	{	
-		Object3D* sphere1 = new Sphere(Vector3(0.5,1,-0.5), 0.3, glass);
+		Object3D* sphere1 = new Sphere(Vector3(0.5,1,0), 0.3, glass);
 		w->add_object(sphere1);
 
 		Object3D* sphere2 = new Sphere(Vector3(-0.5,0.5,.5), 0.3, mirror);
@@ -192,7 +193,7 @@ int main(int argc, char* argv[])
 	// Create Film and rendering engine
 	//
 	film = new Film(sizex,sizey);
-	pm = new PhotonMapping(w, photons_global, photons_caustic, photons_volumetric, max_shots, nb_nearest_photons );
+	pm = new PhotonMapping(w, photons_global, photons_caustic, photons_volumetric, photons_causticvol, max_shots, nb_nearest_photons );
 	engine = new RenderEngine(w, film, &camera, pm);
 	
 	engine->render(name_file);	
