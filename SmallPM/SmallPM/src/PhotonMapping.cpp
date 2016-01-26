@@ -290,10 +290,9 @@ void PhotonMapping::preprocess()
 	int cp = 0;
 	int vp = 0;
 	int kp = 0;
-
 	//////////////////// AJUSTE DE VARIABLES PARA SCATTERING ////////////////////
-	double sigmaS = 0.8;
-	double sigmaA = 0.8;
+	double sigmaS = 0.35;
+	double sigmaA = 0.25;
 	double sigmaT = sigmaS + sigmaA;
 	double lambda = 0.04;
 	// Las globales las usa la funcion de shade para no pasarlas por parametro
@@ -697,7 +696,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
-					Lii += phaseFunction * ((photon.flux/m_volumetric_map.nb_elements()) / volumen);
+					double distancePh = Vector3(photon.position - xt).length();
+					Lii += phaseFunction * ((photon.flux/m_volumetric_map.nb_elements()) / volumen)
+						* ((radio - distancePh) / radio);
 				}
 
 				// Obtiene los k fotones de causticas volumetricas cercanas al paso t (xp = xt)
@@ -706,7 +707,9 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
-					Lii += phaseFunction * ((photon.flux/m_causticvol_map.nb_elements()) / volumen);
+					double distancePh = Vector3(photon.position - xt).length();
+					Lii += phaseFunction * ((photon.flux/m_causticvol_map.nb_elements()) / volumen)
+						* ((radio - distancePh) / radio);
 				}
 				
 				Lii = Lii * (1.0/sigmaS);

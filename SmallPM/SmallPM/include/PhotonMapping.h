@@ -38,12 +38,13 @@ class PhotonMapping
 	unsigned int m_max_nb_shots, m_nb_global_photons, m_nb_caustic_photons, m_nb_volumetric_photons, m_nb_causticvol_photons;
 	unsigned int m_nb_current_shots;
 
+	/* Variables globales de SCATTERING */
 	double globalST;
 	double globalSS;
 	double globalSA;
 	double globalLambda;
 	bool globalParticipative;
-
+	////////////////////////////////////
 
 	unsigned int m_nb_photons;
 	bool m_raytraced_direct;
@@ -93,7 +94,9 @@ public:
  		world(_world), m_max_nb_shots(max_nb_shots), m_nb_current_shots(0),
 		m_nb_global_photons(nb_global_photons), m_nb_caustic_photons(nb_caustic_photons), m_nb_volumetric_photons(nb_volumetric_photons),
 		m_nb_causticvol_photons(nb_causticvol_photons), m_nb_photons(nb_photons), m_raytraced_direct(raytraced_direct)
-	{ }
+	{ 
+
+	}
 	
 	// Preprocess the photon map. This needs to be run before rendering,
 	// or no photons will be stored to compute radiance in the rendering
