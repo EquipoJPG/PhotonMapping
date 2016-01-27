@@ -58,10 +58,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 	
 	// Compute irradiance photon's energy
 	Vector3 energy(p);
-	
 	Ray photon_ray(r);
 	photon_ray.shift();
-
 	bool is_caustic_particle = false;
 
 	//Iterate the path
@@ -71,6 +69,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		Intersection it;
 		world->first_intersection(photon_ray, it);
 
+		// Si no colisiono con nada salimos del bucle
 		if( !it.did_hit() )
 			break;
 
@@ -232,24 +231,18 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			is_caustic_particle = false;
 		}	
 
-		/// INICIO RULETA RUSA ///
 		Real pdf;
-
 		Vector3 surf_albedo = it.intersected()->material()->get_albedo(it);
 		Real avg_surf_albedo = surf_albedo.avg();
-
 		Real epsilon2 = static_cast<Real>(rand())/static_cast<Real>(RAND_MAX);
 		while (epsilon2 < 0.)
 			epsilon2 = static_cast<Real>(rand())/static_cast<Real>(RAND_MAX);
-		
 		if (epsilon2 > avg_surf_albedo || photon_ray.get_level() > 20 ) 
 			break;
 			
 		// Random walk's next step
 		// Get sampled direction plus pdf, and update attenuation
 		it.intersected()->material()->get_outgoing_sample_ray(it, photon_ray, pdf );
-
-		/// FIN RULETA RUSA ///
 
 		// Shade...
 		energy = energy*surf_albedo;
@@ -261,7 +254,8 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 	
 	if( caustic_photons.size() == m_nb_caustic_photons && 
 		global_photons.size() == m_nb_global_photons &&
-		volumetric_photons.size() == m_nb_volumetric_photons)
+		volumetric_photons.size() == m_nb_volumetric_photons &&
+		causticvol_photons.size() == m_nb_causticvol_photons)
 	{
 		m_max_nb_shots = m_nb_current_shots-1;
 		return false;
@@ -291,18 +285,11 @@ void PhotonMapping::preprocess()
 	int vp = 0;
 	int kp = 0;
 	//////////////////// AJUSTE DE VARIABLES PARA SCATTERING ////////////////////
-	double sigmaS = 0.35;
-	double sigmaA = 0.25;
+	double sigmaS = globalST;
+	double sigmaA = globalSA;
 	double sigmaT = sigmaS + sigmaA;
-	double lambda = 0.04;
-	// Las globales las usa la funcion de shade para no pasarlas por parametro
-	globalST = sigmaT;
-	globalSS = sigmaS;
-	globalSA = sigmaA;
-	globalLambda = lambda;
-	bool participativeRoom = true;
-	globalParticipative = participativeRoom;
-	////////////////////// FIN AJUSTE VARIABLES SCATTERING //////////////////////
+	double lambda = globalLambda;
+	bool participativeRoom = globalParticipative;
 
 	while (m_nb_current_shots < m_max_nb_shots)
 	{
@@ -348,14 +335,11 @@ void PhotonMapping::preprocess()
 
 				// Obtiene el foton, lo guarda en el KDTree y lo borra de la lista
 				Photon photon = globalPhotons.front();
-
 				std::vector<Real> photonPosition = std::vector<Real>();
 				photonPosition.push_back(photon.position.getComponent(0));
 				photonPosition.push_back(photon.position.getComponent(1));
 				photonPosition.push_back(photon.position.getComponent(2));
-				
 				m_global_map.store(photonPosition, photon);
-
 				globalPhotons.pop_front(); // elimina el foton almacenado de la lista
 			}
 
@@ -454,6 +438,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// debug = 2 LUZ INDIRECTA
 	// debug = 3 LUZ DIRECTA + INDIRECTA
 	// debug = 4 LUZ DIRECTA + INDIRECTA + SCATTERING
+	// debug = 5 SCATTERING solo
 	int debug = 4;
 
 	// ESTRUCTURA
@@ -492,11 +477,11 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 		newRay.shift();
 		world->first_intersection(newRay, it);
 		rebotes++;
-	}
+	} //////////////// FIN DE REBOTES //////////////////
 
 	pI = it.get_position();	// punto de interseccion (x,y,z)
 	pN = it.get_normal();
-	//////////////// FIN DE REBOTES //////////////////
+	
 	Vector3 LDirecta = Vector3(0);
 	Vector3 LDifusa = Vector3(0);
 	Vector3 LCaustica = Vector3(0);
@@ -529,7 +514,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 					if(rebotes == 0)
 						Ts = std::pow(eD, (-1) * Vector3(pI - lightPos).length() * globalST);
 					else
-						Ts = totalTrans /** std::pow(eD, (-1) * Vector3(pI - lightPos).length() * globalST)*/;
+						Ts = totalTrans;
 				else
 					Ts = 1;
 				
@@ -548,9 +533,6 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	///////////////////////// LUZ INDIRECTA /////////////////////////////////////
 	if(debug == 2 || debug == 3 || debug == 4){
 		/// LUZ INDIRECTA ///
-		// pI = punto de interseccion (x,y,z)
-		// pN = normal en el punto de interseccion
-
 		std::vector<Real> intersection = std::vector<Real>();
 		intersection.push_back(pI.getComponent(0));
 		intersection.push_back(pI.getComponent(1));
@@ -579,8 +561,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
 				sumatorio += (photon.flux/(double) m_global_map.nb_elements()) * 
-									it.intersected()->material()->get_albedo(it) * 
-									((max_distance - distance) / max_distance);
+									it.intersected()->material()->get_albedo(it);
 			}
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
@@ -607,8 +588,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 				/// ECUACION DE RENDER (suma de flujos de fotones) ///
 				sumatorio += (photon.flux/(double) m_caustics_map.nb_elements()) * 
-									it.intersected()->material()->get_albedo(it) * 
-									((max_distance - distance) / max_distance);
+									it.intersected()->material()->get_albedo(it);
 			}
 			// Calcula el area de un circulo de radio la distancia del foton
 			// mas lejano (de los cercanos) respecto al punto de interseccion
@@ -619,7 +599,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	}
 
 	/////////////////////// FOTONES VOLUMETRICOS //////////////////////////////
-	if(debug == 4)
+	if(debug == 4 || debug == 5)
 	{
 		
 		if(!m_volumetric_map.is_empty()){
@@ -674,14 +654,13 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				Real Tt = pow(e, (-1) * (Vector3(xt - xOriginal).length() * sigmaT));
 				
 				Vector3 Lid = Vector3(0);
-				// Luz directa. Este bucle debe estar mal hecho porque provoca una niebla muy densa
-				// que solo se aprecia reduciendo la luz de la imagen en Photoshop
+				// Componente directa de scattering
 				for(int i = 0; i < world->nb_lights(); i++){
 					if(world->light(i).is_visible(xt)){
 						Vector3 lightPos = world->light(i).get_position();
 						double Tr = pow(e, (-1) * (Vector3(lightPos - x).length() * sigmaT));
 						Vector3 intensity = world->light(i).get_incoming_light(xt);
-						Lid += Tr * intensity; /*(1/(4 * 3.14159 * std::pow(Vector3(lightPos - x).length(),2))) **/
+						Lid += Tr * intensity;
 					}
 				}
 
@@ -697,8 +676,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
 					double distancePh = Vector3(photon.position - xt).length();
-					Lii += phaseFunction * ((photon.flux/m_volumetric_map.nb_elements()) / volumen)
-						* ((radio - distancePh) / radio);
+					Lii += phaseFunction * ((photon.flux/m_volumetric_map.nb_elements()) / volumen);
 				}
 
 				// Obtiene los k fotones de causticas volumetricas cercanas al paso t (xp = xt)
@@ -708,8 +686,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				for (int i = 0; i < nearest_photons.size(); i++) {
 					Photon photon = nearest_photons.at(i)->data();
 					double distancePh = Vector3(photon.position - xt).length();
-					Lii += phaseFunction * ((photon.flux/m_causticvol_map.nb_elements()) / volumen)
-						* ((radio - distancePh) / radio);
+					Lii += phaseFunction * ((photon.flux/m_causticvol_map.nb_elements()) / volumen);
 				}
 				
 				Lii = Lii * (1.0/sigmaS);
@@ -730,7 +707,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	}
 
 	Real transmit = 1;
-	if(debug == 4)
+	if(debug == 4 || debug == 5)
 	{
 		double e = 2.7189;
 		Vector3 origen = it.get_ray().get_origin();

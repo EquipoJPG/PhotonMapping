@@ -35,6 +35,7 @@ namespace {
 	Film *film;
 	RenderEngine *engine;
 	PhotonMapping *pm;
+	// Ajuste manual del tamaño de la imagen
 	int sizex = 300, sizey = 300;
 }
 
@@ -42,22 +43,33 @@ namespace {
 // main function - parse arguments and begin rendering.
 int main(int argc, char* argv[])
 {
-
-	//srand(time(0));
-	Real focal_distance = 2.6;
-
+	///////////// AJUSTE MANUAL DE VARIABLES //////////////////
+	// Nombre
 	char *name_file = NULL, *default_name_file = "name_file";
 	name_file = default_name_file;
 
-	// TODO cambiar scene para cambiar la escena XD
+	// Escena
 	unsigned int scene = 1;
 
+	// Fotones
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 
 				 photons_volumetric = 10000,
 				 photons_causticvol = 10000,
 				 max_shots = 100000, 
-				 nb_nearest_photons = 30;
+				 nb_nearest_photons = 100;
+
+	// Scattering!
+	double sigmaScattering = 0.35;
+	double sigmaAbsorcion = 0.25;
+	double lambda = 0.04;
+	bool participative = true;
+
+
+	//////////////////////////////////////////////////////////
+	
+	//srand(time(0));
+	Real focal_distance = 2.6;
 
 	// ---------------------------------------------------------------------
 	// Parse input
@@ -150,8 +162,11 @@ int main(int argc, char* argv[])
 		Object3D* sphere1 = new Sphere(Vector3(0.5,1,0.5), 0.3, glass);
 		w->add_object(sphere1);
 
-		Object3D* sphere2 = new Sphere(Vector3(-0.5,0.5,-0.5), 0.3, mirror);
+		Object3D* sphere2 = new Sphere(Vector3(-0.5,0.5,0.3), 0.3, glass);
 		w->add_object(sphere2);
+
+		Object3D* sphere3 = new Sphere(Vector3(0,0.5,-0.5), 0.3, mirror);
+		w->add_object(sphere3);
 	}
 	break;
 	case 2:
@@ -193,7 +208,8 @@ int main(int argc, char* argv[])
 	// Create Film and rendering engine
 	//
 	film = new Film(sizex,sizey);
-	pm = new PhotonMapping(w, photons_global, photons_caustic, photons_volumetric, photons_causticvol, max_shots, nb_nearest_photons );
+	pm = new PhotonMapping(w, photons_global, photons_caustic, photons_volumetric, photons_causticvol, max_shots, nb_nearest_photons,
+		sigmaScattering, sigmaAbsorcion, lambda, participative );
 	engine = new RenderEngine(w, film, &camera, pm);
 	
 	engine->render(name_file);	
