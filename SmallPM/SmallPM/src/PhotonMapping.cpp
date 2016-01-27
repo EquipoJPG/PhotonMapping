@@ -110,7 +110,7 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 			// De tal forma que iterara un maximo de 'max_pasitos' veces (Nota esto es una solucion propia que no
 			// figura en ningun paper
 			int pasitos = 0;
-			int max_pasitos = 30;
+			int max_pasitos = 50;
 
 			// Mientras no se haya pasado del punto de interseccion y no se haya absorbido y los pasitos sean menores
 			// que max_pasitos (esto ultimo solo si no ha habido interseccion)

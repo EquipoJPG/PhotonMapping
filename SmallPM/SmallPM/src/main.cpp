@@ -56,12 +56,12 @@ int main(int argc, char* argv[])
 				 photons_caustic = 10000, 
 				 photons_volumetric = 10000,
 				 photons_causticvol = 10000,
-				 max_shots = 200000, 
-				 nb_nearest_photons = 200;
+				 max_shots = 100000, 
+				 nb_nearest_photons = 55;
 
 	// Scattering!
 	double sigmaScattering = 0.7;
-	double sigmaAbsorcion = 0.4;
+	double sigmaAbsorcion = 0.43;
 	double lambda = 0.04;
 	bool participative = true;
 
