@@ -36,7 +36,7 @@ namespace {
 	RenderEngine *engine;
 	PhotonMapping *pm;
 	// Ajuste manual del tamaño de la imagen
-	int sizex = 128, sizey = 128;
+	int sizex = 300, sizey = 300;
 }
 
 
@@ -56,12 +56,12 @@ int main(int argc, char* argv[])
 				 photons_caustic = 10000, 
 				 photons_volumetric = 10000,
 				 photons_causticvol = 10000,
-				 max_shots = 10000, 
-				 nb_nearest_photons = 10;
+				 max_shots = 200000, 
+				 nb_nearest_photons = 200;
 
 	// Scattering!
-	double sigmaScattering = 0.65;
-	double sigmaAbsorcion = 0.35;
+	double sigmaScattering = 0.7;
+	double sigmaAbsorcion = 0.4;
 	double lambda = 0.04;
 	bool participative = true;
 
@@ -200,7 +200,7 @@ int main(int argc, char* argv[])
 		w->add_object(sphere2);
 	}
 	}
-	LightSource* ls = new PointLightSource(w, Vector3(0,1.9,0), Vector3(5,2,5));
+	LightSource* ls = new PointLightSource(w, Vector3(0,1.9,0), Vector3(5,5,5));
 	w->add_light(ls);
 
 	w->fix();
