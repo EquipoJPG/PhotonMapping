@@ -36,7 +36,7 @@ namespace {
 	RenderEngine *engine;
 	PhotonMapping *pm;
 	// Ajuste manual del tamaño de la imagen
-	int sizex = 300, sizey = 300;
+	int sizex = 100, sizey = 100;
 }
 
 
@@ -60,8 +60,8 @@ int main(int argc, char* argv[])
 				 nb_nearest_photons = 55;
 
 	// Scattering!
-	double sigmaScattering = 0.7;
-	double sigmaAbsorcion = 0.43;
+	double sigmaScattering = 0.5;
+	double sigmaAbsorcion = 0.2;
 	double lambda = 0.04;
 	bool participative = true;
 

@@ -520,7 +520,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 				
 				// TERMINO DIFUSO = Kd x Id x (L . N)
 				Vector3 Id = lt->get_incoming_light(pI) * Ts;
-				Vector3 Kd = it.intersected()->material()->get_albedo(it);
+				Vector3 Kd = it.intersected()->material()->get_albedo(it)/3.1415;
 				float cos = shadowRay.dot(pN);
 				LDirecta += Kd * Id * cos;
 
